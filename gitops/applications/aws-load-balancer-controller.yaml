@@ -1,0 +1,44 @@
+---
+# =============================================================================
+# AWS Load Balancer Controller
+# =============================================================================
+# Manages ALB/NLB resources for Kubernetes Ingress and Service objects
+# IRSA role ARN must be updated with actual value from Terraform outputs
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aws-load-balancer-controller
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"  # Install before application workloads
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: kube-system
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    repoURL: https://aws.github.io/eks-charts
+    chart: aws-load-balancer-controller
+    targetRevision: 1.8.1
+    helm:
+      parameters:
+        - name: clusterName
+          value: devops-quiz-eks  # Must match EKS cluster name from Terraform
+        - name: region
+          value: eu-north-1
+        - name: serviceAccount.create
+          value: "true"
+        - name: serviceAccount.name
+          value: aws-load-balancer-controller
+        # TODO: Update with actual IRSA role ARN from Terraform output: alb_controller_role_arn
+        - name: serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn
+          value: REPLACE_WITH_TERRAFORM_OUTPUT_alb_controller_role_arn
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

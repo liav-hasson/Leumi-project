@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "quiz-app.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "quiz-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: quiz-app
+spec:
+  replicas: {{ .Values.app.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "quiz-app.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: quiz-app
+  template:
+    metadata:
+      labels:
+        {{- include "quiz-app.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: quiz-app
+    spec:
+      serviceAccountName: {{ include "quiz-app.serviceAccountName" . }}
+      containers:
+        - name: quiz-app
+          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.app.service.targetPort }}
+              protocol: TCP
+          env:
+            {{- toYaml .Values.app.env | nindent 12 }}
+            {{- if .Values.externalSecrets.enabled }}
+            # OpenAI API key from External Secrets
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.secrets[0].target }}
+                  key: {{ .Values.externalSecrets.secrets[0].property }}
+            {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.probes.liveness | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.probes.readiness | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

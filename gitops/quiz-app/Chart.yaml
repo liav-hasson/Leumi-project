@@ -1,0 +1,16 @@
+apiVersion: v2
+name: quiz-app
+description: Helm chart for DevOps Quiz Application with OpenAI integration
+
+# Application chart for deploying:
+# - Flask-based quiz application
+# - OpenAI API integration for question generation
+# - External Secrets for SSM Parameter Store integration
+# - Ingress for ALB access
+type: application
+
+# Chart version - increment when making chart changes
+version: 0.1.0
+
+# Application version - Quiz App version
+appVersion: "1.0.0"

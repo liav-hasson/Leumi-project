@@ -1,0 +1,39 @@
+---
+# =============================================================================
+# Quiz Application - ArgoCD Application
+# =============================================================================
+# Deploys the Flask-based quiz application with OpenAI integration
+# Helm chart includes: deployment, service, ingress, external secrets
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quiz-app
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"  # Deploy after infrastructure (ALB, External Secrets)
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: quiz-app
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: gitops/quiz-app
+    repoURL: https://github.com/liav/FIBI-project.git  # TODO: Update with your actual GitHub repo URL
+    targetRevision: main
+    helm:
+      valueFiles:
+        - values.yaml
+      # Override image tag from Jenkins pipeline
+      # parameters:
+      #   - name: app.image.tag
+      #     value: "v1.0.0"  # Will be set by Jenkins pipeline
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground

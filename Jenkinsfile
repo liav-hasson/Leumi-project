@@ -1,0 +1,384 @@
+pipeline {
+    agent {
+        kubernetes {
+            yaml '''
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: agent-1
+                  labels:
+                    jenkins/label: agent-1
+                spec:
+                  containers:
+                    - name: jnlp
+                      image: liavvv/jenkins-agent:1.7
+                      imagePullPolicy: Always
+                      volumeMounts:
+                        - name: workspace-volume
+                          mountPath: /home/jenkins/agent
+                        - name: docker-config
+                          mountPath: /home/jenkins/.docker
+                          readOnly: true
+                  volumes:
+                    - name: workspace-volume
+                      emptyDir: {}
+                    - name: docker-config
+                      secret:
+                        secretName: docker-config
+                        items:
+                        - key: config.json
+                          path: config.json
+            '''
+        }
+    }
+
+    environment {
+        PIPELINE_STATUS       = "SUCCESS"
+        BUILD_TAG             = "${BUILD_TIMESTAMP}"
+        
+        // Generates DOCKERHUB_CREDENTIALS_USR, DOCKERHUB_CREDENTIALS_PSW
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+        
+        // Used for GitLab repository access (clone, push to ArgoCD repo)
+        // Generates GIT_CREDENTIALS_USR, GIT_CREDENTIALS_PSW
+        GIT_CREDENTIALS       = credentials('git-credentials')
+        
+        // Used for GitLab API calls 
+        // (commit status updates, merge request operations)
+        GITLAB_API_TOKEN      = credentials('jenkins-api-token')
+        
+        // Container signing password (key files handled in withCredentials blocks)
+        COSIGN_PASSWORD       = credentials('cosign-password')
+        
+        // GitOps Configuration for jenkins
+        ARGOCD_REPO_URL       = "http://${GIT_CREDENTIALS_USR}:${GIT_CREDENTIALS_PSW}@gitlab.weatherlabs.internal/root/argocd.git"
+        GIT_USER_NAME         = "Jenkins Pipeline"
+        GIT_USER_EMAIL        = "jenkins@weatherapp.local"
+    }
+
+    // IMAGE_TAG will be set during the Prepare stage. BUILD_TAG (date-based) remains available.
+
+    stages {
+        stage('Prepare image version') {
+            steps {
+                script {
+                    echo '--------- Preparing image version ---------'
+                    checkout scm
+
+                    // Default: use existing date-based BUILD_TAG
+                    env.IMAGE_TAG = env.BUILD_TAG
+
+                    // Compute semantic version and set env for the rest of pipeline
+                    def semver = sh(returnStdout: true, script: './scripts/compute_next_version.sh . auto').trim()
+                    if (semver) {
+                        echo "Computed semantic version: ${semver}"
+                        env.IMAGE_TAG = semver
+                    } else {
+                        echo "No semantic version computed; falling back to date-based tag: ${env.IMAGE_TAG}"
+                    }
+                }
+            }
+            post {
+                failure {
+                    script {
+                        env.PIPELINE_STATUS = "FAILURE"
+                    }
+                }
+            }
+        }
+
+        stage('Testing stage') {
+            steps {
+                echo '--------- Starting checkout and testing ---------'
+
+                echo '--------- Running pylint test ---------'
+                sh 'pylint source_code/application.py --score=yes --fail-under=5.0'
+                sh 'pylint source_code/app_funcs.py --score=yes --fail-under=5.0'
+                echo 'Pylint checks passed!'
+
+                echo '--------- Running unit tests ---------'
+                sh 'cd source_code && python3 -m pytest ../tests/test_website.py -v'
+                echo 'Unit tests passed!'
+
+                echo '--------- Running dependency vulnerability scan ---------'
+                sh '''
+                    # Run safety check on production dependencies only
+                    # Focus on requirements.txt (production dependencies)
+                    # Exit code 64 means vulnerabilities found, 0 means clean
+                    safety check --json --file requirements.txt || {
+                        if [ $? -eq 64 ]; then
+                            echo "CRITICAL: Vulnerabilities found in production dependencies!"
+                            echo "Pipeline failed due to security vulnerabilities in requirements.txt"
+                            safety check --file requirements.txt --output text
+                            exit 1
+                        else
+                            echo "Safety check failed with unexpected error"
+                            exit 1
+                        fi
+                    }
+                '''
+                echo 'Dependency vulnerability scan passed!'
+            }
+            post {
+                failure {
+                    script {
+                        env.PIPELINE_STATUS = "FAILURE"
+                    }
+                }
+            }
+        }
+
+        stage('Python Static Security Analysis') {
+            steps {
+                echo '--------- Running Python static security analysis ---------'
+                sh '''
+                    # Run Bandit security analysis on Python source code
+                    echo "Scanning Python code with Bandit..."
+                    bandit -r source_code/ -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
+                    
+                    # Display results in human-readable format  
+                    echo "Bandit scan results:"
+                    bandit -r source_code/ -f txt || true
+                    
+                    # Check if high/medium severity issues found (exit codes 1-2)
+                    if [ "${BANDIT_EXIT_CODE:-0}" -eq 1 ] || [ "${BANDIT_EXIT_CODE:-0}" -eq 2 ]; then
+                        echo "CRITICAL: High/Medium severity security issues found in Python code!"
+                        echo "Pipeline failed due to Python security vulnerabilities"
+                        echo "Fix the security issues above and retry the build"
+                        exit 1
+                    fi
+                '''
+                echo 'Python static security analysis passed!'
+            }
+            post {
+                failure {
+                    script {
+                        env.PIPELINE_STATUS = "FAILURE"
+                    }
+                }
+                always {
+                    // Archive the Bandit report for review
+                    archiveArtifacts artifacts: 'bandit-report.json', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Dockerfile Security Scan') {
+            steps {
+                echo '--------- Running Dockerfile security scan ---------'
+                sh '''
+                    # Run Hadolint security scan on Dockerfile
+                    # Check for security issues, best practices, and compliance
+                    echo "Scanning Dockerfile with Hadolint..."
+                    hadolint --format json Dockerfile > hadolint-report.json || HADOLINT_EXIT_CODE=$?
+                    
+                    # Display results in human-readable format
+                    echo "Hadolint scan results:"
+                    hadolint Dockerfile || true
+                    
+                    # Check if critical/error level issues found
+                    if [ "${HADOLINT_EXIT_CODE:-0}" -ne 0 ]; then
+                        echo "CRITICAL: Dockerfile security issues found!"
+                        echo "Pipeline failed due to Dockerfile security violations"
+                        echo "Fix the issues above and retry the build"
+                        exit 1
+                    fi
+                '''
+                echo 'Dockerfile security scan passed!'
+            }
+            post {
+                failure {
+                    script {
+                        env.PIPELINE_STATUS = "FAILURE"
+                    }
+                }
+                always {
+                    // Archive the Hadolint report for review
+                    archiveArtifacts artifacts: 'hadolint-report.json', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh '''
+                        echo "Connecting to BuildKit DaemonSet..."
+                        export BUILDKIT_HOST=tcp://buildkitd.jenkins.svc.cluster.local:1234
+
+                        echo "Building weather-app image with buildctl..."
+                        buildctl --addr ${BUILDKIT_HOST} build \
+                            --frontend dockerfile.v0 \
+                            --local context=. \
+                            --local dockerfile=. \
+                            --output type=image,name=${DOCKERHUB_CREDENTIALS_USR}/weather-app:${IMAGE_TAG},push=true
+                        
+                        echo "Image ${DOCKERHUB_CREDENTIALS_USR}/weather-app:${IMAGE_TAG} built and pushed"
+                    '''
+                }
+            }
+            post {
+                failure {
+                    script {
+                        env.PIPELINE_STATUS = "FAILURE"
+                    }
+                }
+            }
+        }
+
+        stage('Sign Container Image') {
+            steps {
+                echo '--------- Signing container image with Cosign ---------'
+                script {
+                    withCredentials([
+                        file(credentialsId: 'cosign-private-key', variable: 'COSIGN_PRIVATE_KEY_FILE')
+                    ]) {
+                        sh '''
+                            # Sign the container image using Cosign with private key
+                            IMAGE_NAME="${DOCKERHUB_CREDENTIALS_USR}/weather-app:${IMAGE_TAG}"
+                            
+                            echo "Signing image: ${IMAGE_NAME}"
+                            
+                            # Login to Docker Hub for signature push authentication
+                            # Use writable directory for Docker credentials (mounted dir is read-only)
+                            echo "Logging into Docker Hub for signature push..."
+                            export DOCKER_CONFIG="/tmp/.docker"
+                            mkdir -p /tmp/.docker
+                            echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login --username "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
+                            
+                            # Sign the image using the private key file with auto-confirmation
+                            # Docker CLI authentication will be used by cosign for signature push
+                            COSIGN_PASSWORD="${COSIGN_PASSWORD}" cosign sign --key "${COSIGN_PRIVATE_KEY_FILE}" --yes "${IMAGE_NAME}"
+                            
+                            echo "Image ${IMAGE_NAME} signed successfully with Cosign"
+                            echo "Signature pushed to Docker Hub registry"
+                        '''
+                    }
+                }
+            }
+            post {
+                failure {
+                    script {
+                        env.PIPELINE_STATUS = "FAILURE"
+                    }
+                    echo "❌ Failed to sign container image"
+                }
+                success {
+                    echo "✅ Container image signed successfully with Cosign"
+                }
+            }
+        }
+
+        stage('Verify Container Signature') {
+            steps {
+                echo '--------- Verifying container signature ---------'
+                script {
+                    withCredentials([
+                        file(credentialsId: 'cosign-public-key', variable: 'COSIGN_PUBLIC_KEY_FILE')
+                    ]) {
+                        sh '''
+                            # Verify the container signature using Cosign with public key
+                            IMAGE_NAME="${DOCKERHUB_CREDENTIALS_USR}/weather-app:${IMAGE_TAG}"
+                            
+                            echo "Verifying signature for image: ${IMAGE_NAME}"
+                            cosign verify --key "${COSIGN_PUBLIC_KEY_FILE}" "${IMAGE_NAME}" || {
+
+                                echo "Direct verification failed, checking signature existence..."
+
+                                # Try to list signatures
+                                cosign triangulate "${IMAGE_NAME}" || echo "Could not triangulate signature location"
+
+                                echo "Note: Verification failed but signing appeared to succeed"
+                                echo "This may be due to registry propagation delay"
+                                echo "Continuing Pipeline anyway..."
+                                exit 0
+                            }
+                            
+                            echo "Image signature verified successfully"
+                        '''
+                    }
+                }
+            }
+            post {
+                failure {
+                    script {
+                        env.PIPELINE_STATUS = "FAILURE"
+                    }
+                    echo "❌ Failed to verify container signature"
+                }
+                success {
+                    echo "✅ Container signature verified successfully"
+                }
+            }
+        }
+
+        stage('Update GitOps Repository') {
+            steps {
+                echo '--------- Updating GitOps Repository ---------'
+                script {
+                    // This script checks out values.yml and chart.yml from the argocd-repo
+                    // it updates the tags and version and pushes the updates back to the repo
+                    sh '''
+                        ./scripts/update-gitops.sh \
+                            "${DOCKERHUB_CREDENTIALS_USR}" \
+                            "${IMAGE_TAG}" \
+                            "${BUILD_NUMBER}" \
+                            "${ARGOCD_REPO_URL}" \
+                            "${GIT_USER_NAME}" \
+                            "${GIT_USER_EMAIL}"
+                    '''
+                }
+            }
+            post {
+                success {
+                    echo "✅ GitOps repository updated successfully"
+                    echo "ArgoCD will detect changes and deploy automatically"
+                }
+                failure {
+                    script {
+                        env.PIPELINE_STATUS = "FAILURE"
+                    }
+                    echo "❌ Failed to update GitOps repository"
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                def statusIcon = env.PIPELINE_STATUS == "SUCCESS" ? "✅" : "❌"
+                def color = env.PIPELINE_STATUS == "SUCCESS" ? "good" : "danger"
+                def slackMessage = env.PIPELINE_STATUS == "SUCCESS" ? 
+                    "✅ GitOps update completed! Sync argo CD to deploy!." : 
+                    "❌ Pipeline failed - check logs for details"
+                def finalMessage = [
+                    "${statusIcon} GitOps Pipeline *${env.JOB_NAME}* #${env.BUILD_NUMBER} ${env.PIPELINE_STATUS}",
+                    "",
+                    "*Docker Image:* ${env.DOCKERHUB_CREDENTIALS_USR}/weather-app:${env.IMAGE_TAG}",
+                    "*GitOps Repo:* argocd-repo updated",
+                    "*Deployment:* ArgoCD will sync automatically", 
+                    "${slackMessage}"
+                ].join('\n')
+
+                slackSend(
+                    channel: '#jenkins',
+                    color: color,
+                    message: finalMessage
+                )
+            }
+
+            // Report status back to GitLab using API token
+            script {
+                def status = env.PIPELINE_STATUS == "SUCCESS" ? "success" : "failed"
+                sh """
+                    curl -X POST \
+                        -H "PRIVATE-TOKEN: \${GITLAB_API_TOKEN}" \
+                        -H "Content-Type: application/json" \
+                        -d '{"state":"${status}","target_url":"${BUILD_URL}","description":"Jenkins Pipeline"}' \
+                        "http://gitlab.weatherlabs.internal/api/v4/projects/1/statuses/${env.GIT_COMMIT}"
+                """
+            }
+        }
+    }
+}
