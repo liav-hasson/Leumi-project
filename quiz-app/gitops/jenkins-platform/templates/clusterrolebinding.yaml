@@ -1,0 +1,18 @@
+{{- if .Values.jenkins.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.jenkins.clusterRoleBindingName }}
+  labels:
+    app.kubernetes.io/name: jenkins
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/managed-by: argocd
+subjects:
+- kind: ServiceAccount
+  name: {{ .Values.jenkins.serviceAccountName }}
+  namespace: {{ .Values.jenkins.namespace }}
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

@@ -1,0 +1,8 @@
+apiVersion: v2
+name: jenkins-platform
+description: Jenkins Agent Platform Resources for EKS - provides namespace, RBAC, and BuildKit for CI/CD
+type: application
+version: 1.0.0
+appVersion: "1.0"
+maintainers:
+  - name: Liav

@@ -1,0 +1,90 @@
+{{- if and .Values.jenkins.enabled .Values.buildkit.enabled }}
+# BuildKit DaemonSet
+# Provides Docker image building capabilities without Docker daemon
+# Runs on every node with privileged access for container builds
+# 
+# Jenkins agents connect to: tcp://buildkitd.jenkins.svc.cluster.local:1234
+# 
+# Benefits over Docker-in-Docker:
+# - Better caching across builds
+# - More secure (no Docker socket mounting)
+# - Faster parallel builds
+# - Built-in registry authentication
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: buildkit-daemon
+  namespace: {{ .Values.buildkit.namespace }}
+  labels:
+    app: buildkit-daemon
+    app.kubernetes.io/name: buildkit
+    app.kubernetes.io/component: build
+    app.kubernetes.io/managed-by: argocd
+spec:
+  selector:
+    matchLabels:
+      app: buildkit-daemon
+  template:
+    metadata:
+      labels:
+        app: buildkit-daemon
+    spec:
+      containers:
+      - name: buildkitd
+        image: {{ .Values.buildkit.image }}
+        args:
+        - --addr
+        - tcp://0.0.0.0:{{ .Values.buildkit.port }}
+        - --root
+        - /var/lib/buildkit
+        - --oci-worker-no-process-sandbox
+        ports:
+        - containerPort: {{ .Values.buildkit.port }}
+          name: buildkit
+          protocol: TCP
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: buildkit-cache
+          mountPath: /var/lib/buildkit
+        {{- if .Values.buildkit.dockerConfigSecretName }}
+        - name: docker-config
+          mountPath: /root/.docker
+          readOnly: true
+        {{- end }}
+        resources:
+          requests:
+            cpu: {{ .Values.buildkit.resources.requests.cpu }}
+            memory: {{ .Values.buildkit.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.buildkit.resources.limits.cpu }}
+            memory: {{ .Values.buildkit.resources.limits.memory }}
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.buildkit.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.buildkit.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: buildkit-cache
+        hostPath:
+          path: /var/lib/buildkit
+          type: DirectoryOrCreate
+      {{- if .Values.buildkit.dockerConfigSecretName }}
+      - name: docker-config
+        secret:
+          secretName: {{ .Values.buildkit.dockerConfigSecretName }}
+          items:
+          - key: config.json
+            path: config.json
+      {{- end }}
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
+{{- end }}
