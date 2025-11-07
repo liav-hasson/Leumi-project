@@ -30,12 +30,13 @@ spec:
           env:
             {{- toYaml .Values.app.env | nindent 12 }}
             {{- if .Values.externalSecrets.enabled }}
+            {{- $secret := index .Values.externalSecrets.secrets 0 }}
             # OpenAI API key from External Secrets
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.externalSecrets.secrets[0].target }}
-                  key: {{ .Values.externalSecrets.secrets[0].property }}
+                  name: {{ $secret.target }}
+                  key: {{ $secret.property }}
             {{- end }}
           livenessProbe:
             {{- toYaml .Values.probes.liveness | nindent 12 }}
