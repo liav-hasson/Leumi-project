@@ -24,3 +24,8 @@ variable "enable_deletion_protection" {
   type        = bool
   default     = false
 }
+
+variable "cluster_name" {
+  description = "EKS cluster name for ALB controller management"
+  type        = string
+}

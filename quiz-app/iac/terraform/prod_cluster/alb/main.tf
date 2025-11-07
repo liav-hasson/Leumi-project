@@ -51,7 +51,7 @@ resource "aws_security_group" "alb" {
 
 # Application Load Balancer
 resource "aws_lb" "main" {
-  name               = "${var.project_name}-alb"
+  name               = "${var.cluster_name}-alb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
@@ -64,7 +64,9 @@ resource "aws_lb" "main" {
   tags = merge(
     var.common_tags,
     {
-      Name = "${var.project_name}-alb"
+      Name = "${var.cluster_name}-alb"
+      # Required tag for AWS Load Balancer Controller to manage this ALB
+      "elbv2.k8s.aws/cluster" = var.cluster_name
     }
   )
 }
@@ -111,18 +113,3 @@ resource "aws_lb_listener" "http" {
     }
   }
 }
-
-# HTTPS Listener (placeholder - you'll need to add certificate ARN)
-# Uncomment and configure when you have an ACM certificate
-# resource "aws_lb_listener" "https" {
-#   load_balancer_arn = aws_lb.main.arn
-#   port              = "443"
-#   protocol          = "HTTPS"
-#   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-#   certificate_arn   = var.acm_certificate_arn
-#
-#   default_action {
-#     type             = "forward"
-#     target_group_arn = aws_lb_target_group.default.arn
-#   }
-# }

@@ -53,6 +53,7 @@ module "alb" {
   source = "./alb"
 
   project_name               = var.cluster_name
+  cluster_name               = var.cluster_name
   vpc_id                     = var.vpc_id
   public_subnet_ids          = var.public_subnets
   common_tags                = var.tags
