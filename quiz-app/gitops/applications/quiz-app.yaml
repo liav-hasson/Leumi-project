@@ -20,8 +20,8 @@ spec:
     server: https://kubernetes.default.svc
   project: default
   source:
-    path: gitops/quiz-app
-    repoURL: https://github.com/liav/Leumi-project.git
+    path: quiz-app/gitops/quiz-app
+    repoURL: https://github.com/liavvv/Leumi-project.git
     targetRevision: main
     helm:
       valueFiles:
