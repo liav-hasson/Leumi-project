@@ -128,7 +128,7 @@ resource "aws_route53_record" "argocd" {
 }
 
 # Public DNS: jenkins.yourdomain.com → ALB (Jenkins EC2)
-resource "aws_route53_record" "jenkins" {
+resource "aws_route53_record" "jenkins_public" {
   count = var.public_zone_enabled ? 1 : 0
   
   zone_id = data.aws_route53_zone.public[0].zone_id
