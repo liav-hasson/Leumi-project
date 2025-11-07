@@ -35,7 +35,7 @@ spec:
           value: aws-load-balancer-controller
         # IRSA role ARN injected by inject-argocd-values.sh from Terraform output
         - name: serviceAccount.annotations.eks\.amazonaws\.com/role-arn
-          value: arn:aws:iam::610964304971:role/devops-quiz-alb-controller-irsa
+          value: REPLACE_WITH_TERRAFORM_OUTPUT_alb_controller_role_arn
   syncPolicy:
     automated:
       prune: true

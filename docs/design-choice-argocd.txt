@@ -1,0 +1,10 @@
+* draft document
+
+why did i choose app of apps pattern?
+why not applications, or applicationset?
+
+- 
+
+what secret resources do i use?
+
+- 

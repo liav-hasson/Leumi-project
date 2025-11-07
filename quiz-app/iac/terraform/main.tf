@@ -60,35 +60,6 @@ module "jenkins" {
   instance_name             = "${var.project_name}-jenkins"
 }
 
-# Production EKS Cluster
-module "prod_cluster" {
-  source = "./prod_cluster"
-
-  # Use existing VPC
-  vpc_id          = module.vpc.vpc_id
-  private_subnets = module.vpc.private_subnet_ids
-  public_subnets  = module.vpc.public_subnet_ids
-
-  # Configuration from variables
-  aws_region         = var.aws_region
-  cluster_name       = var.eks_cluster_name
-  kubernetes_version = var.kubernetes_version
-  node_groups        = var.eks_node_groups
-  certificate_arn    = "arn:aws:acm:eu-north-1:610964304971:certificate/d45cf518-4b6d-4028-9942-30f90d104aa6"
-
-  # Cross-module security group references
-  jenkins_security_group_id = module.security_groups.jenkins_security_group_id
-
-  # Tags
-  tags = merge(
-    var.common_tags,
-    {
-      Environment = var.environment
-      ClusterName = var.eks_cluster_name
-    }
-  )
-}
-
 # Route53 DNS & ACM Certificate
 module "route53" {
   source = "./modules/route53"
@@ -107,8 +78,36 @@ module "route53" {
   public_domain        = var.public_domain
   quiz_app_subdomain   = var.quiz_app_subdomain
   argocd_subdomain     = var.argocd_subdomain
-  alb_dns_name         = module.prod_cluster.alb_dns_name
-  alb_zone_id          = module.prod_cluster.alb_zone_id
+  alb_dns_name         = try(module.prod_cluster.alb_dns_name, "")
+  alb_zone_id          = try(module.prod_cluster.alb_zone_id, "")
+}
 
-  depends_on = [module.prod_cluster]
+# Production EKS Cluster  
+module "prod_cluster" {
+  source = "./prod_cluster"
+
+  # Use existing VPC
+  vpc_id          = module.vpc.vpc_id
+  private_subnets = module.vpc.private_subnet_ids
+  public_subnets  = module.vpc.public_subnet_ids
+
+  # Configuration from variables
+  aws_region         = var.aws_region
+  cluster_name       = var.eks_cluster_name
+  kubernetes_version = var.kubernetes_version
+  node_groups        = var.eks_node_groups
+  # Use certificate from route53 module - this creates implicit dependency
+  certificate_arn    = module.route53.acm_certificate_arn
+
+  # Cross-module security group references
+  jenkins_security_group_id = module.security_groups.jenkins_security_group_id
+
+  # Tags
+  tags = merge(
+    var.common_tags,
+    {
+      Environment = var.environment
+      ClusterName = var.eks_cluster_name
+    }
+  )
 }

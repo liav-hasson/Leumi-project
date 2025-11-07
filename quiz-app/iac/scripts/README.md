@@ -1,17 +1,49 @@
-# show visual examples of the scripts usage.
+# Core Project Scrips  
 
-liav@liav-laptop:~/github/Leumi-project$ manage-project -h
+- the purpose of the scripts is to provide utilities, and make the workflow easy.
+  
+## How To Use
+
+### Add add the scripts to your .bashrc file
+
+```bash
+# Go to the script directory
+cd ~/github/Leumi-project/quiz-app/iac/scripts/management
+
+# Get absolute path
+SCRIPTS_DIR="$(pwd)"
+
+# Append to ~/.bashrc
+{
+  echo ""
+  echo "# === Leumi Project Management Scripts ==="
+  echo "alias manage-project='bash \"$SCRIPTS_DIR/manage-project.sh\"'"
+  echo "alias monitor-deployment='bash \"$SCRIPTS_DIR/monitor-deployment.sh\"'"
+  echo "alias project-utils='bash \"$SCRIPTS_DIR/project-utils.sh\"'"
+  echo "# ========================================"
+} >> ~/.bashrc
+
+# Reload bashrc immediately
+source ~/.bashrc
+```
+
+## 1. manage-project
+
+```bash
+$ manage-project -h
 Usage: manage-project {apply|destroy|validate}
+
 
 Commands:
   --apply,    -a     - Deploy infrastructure and configure GitOps
   --destroy,  -d     - Tear down all infrastructure
   --validate, -v     - Validate Helm chart structure and configuration
+```
 
-Infrastructure: EKS cluster, Jenkins, ALB, Route53, ArgoCD, Quiz App
+## 2. monitor-deploy
 
-
-liav@liav-laptop:~/github/Leumi-project$ monitor-deploy -h
+```bash
+$ monitor-deploy -h
 
 🖥️  WeatherLabs Deployment Monitor
 =================================
@@ -28,12 +60,15 @@ Options:
 Notes:
   • Logs are stored under /tmp/quiz-app-deploy
   • Use --filter during deployments for a concise view
+```
 
+## 3. project-utils
 
-liav@liav-laptop:~/github/Leumi-project$ project-utils -h
+```bash
+$ project-utils -h
 
 ╔════════════════════════════════════════════════════════════╗
-║        Quiz App DevOps - Project Utilities                ║
+║        Quiz App DevOps - Project Utilities                 ║
 ╚════════════════════════════════════════════════════════════╝
 
 Usage: project-utils [OPTIONS]
@@ -43,3 +78,5 @@ Options:
   --argocd,   -r       Show ArgoCD status
   --open,     -o       Open web UIs in browser
   --help,     -h       Show this help
+
+```
