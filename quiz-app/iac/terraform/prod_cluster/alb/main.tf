@@ -97,6 +97,36 @@ resource "aws_lb_target_group" "default" {
   )
 }
 
+# Quiz App Target Group (managed via TargetGroupBinding)
+resource "aws_lb_target_group" "quiz_app" {
+  name        = "${var.project_name}-quiz-app-tg"
+  port        = 5000
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"  # Required for EKS with IP mode
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 5
+    interval            = 30
+    path                = "/"
+    protocol            = "HTTP"
+    matcher             = "200"
+    port                = "traffic-port"
+  }
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.project_name}-quiz-app-tg"
+      # Required for TargetGroupBinding to discover this target group
+      "elbv2.k8s.aws/cluster" = var.cluster_name
+    }
+  )
+}
+
 # HTTP Listener (redirects to HTTPS)
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
@@ -112,4 +142,48 @@ resource "aws_lb_listener" "http" {
       status_code = "HTTP_301"
     }
   }
+}
+
+# HTTPS Listener
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = "443"
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
+  certificate_arn   = var.certificate_arn
+
+  # Default action (return 404 for unknown hosts)
+  default_action {
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "Not Found"
+      status_code  = "404"
+    }
+  }
+}
+
+# HTTPS Listener Rule for Quiz App
+resource "aws_lb_listener_rule" "quiz_app" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.quiz_app.arn
+  }
+
+  condition {
+    host_header {
+      values = ["quiz.weatherlabs.org"]
+    }
+  }
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.project_name}-quiz-app-rule"
+    }
+  )
 }

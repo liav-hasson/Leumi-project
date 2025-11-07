@@ -5,15 +5,21 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB_ROOT="$(cd "$SCRIPT_DIR/../lib/operations" && pwd)"
+LIB_ROOT="$(cd "$SCRIPT_DIR/../lib" && pwd)"
 
-# exporting scripts called by apply execute
-source "$LIB_ROOT/apply/common.sh"
-source "$LIB_ROOT/apply/terraform.sh"
-source "$LIB_ROOT/apply/inject-argocd-values.sh"
-source "$LIB_ROOT/apply/workflow.sh"
-source "$SCRIPT_DIR/../lib/helpers/logging-helpers.sh"
-source "$SCRIPT_DIR/../lib/helpers/validation-helpers.sh"
+# Source helper scripts FIRST (needed by operation scripts)
+source "$LIB_ROOT/helpers/logging-helpers.sh"
+source "$LIB_ROOT/helpers/validation-helpers.sh"
+source "$LIB_ROOT/helpers/git-helpers.sh"
+source "$LIB_ROOT/helpers/notification-helpers.sh"
+
+# Source operation scripts (depend on helpers above)
+source "$LIB_ROOT/operations/apply/common.sh"
+source "$LIB_ROOT/operations/apply/git.sh"
+source "$LIB_ROOT/operations/apply/terraform.sh"
+source "$LIB_ROOT/operations/apply/inject-argocd-values.sh"
+source "$LIB_ROOT/operations/apply/argocd.sh"
+source "$LIB_ROOT/operations/apply/workflow.sh"
 
 # calls bootstrap/operations/apply/workflow.sh
 terraform-apply() {

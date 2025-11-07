@@ -1,0 +1,35 @@
+{{- if .Values.targetGroupBinding.enabled -}}
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: {{ include "quiz-app.fullname" . }}-tgb
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "quiz-app.labels" . | nindent 4 }}
+spec:
+  serviceRef:
+    name: {{ .Values.targetGroupBinding.serviceRef.name }}
+    port: {{ .Values.targetGroupBinding.serviceRef.port }}
+  targetGroupARN: {{ .Values.targetGroupBinding.targetGroupARN }}
+  targetType: {{ .Values.targetGroupBinding.targetType }}
+  {{- if .Values.targetGroupBinding.networking }}
+  networking:
+    {{- if .Values.targetGroupBinding.networking.ingress }}
+    ingress:
+    {{- range .Values.targetGroupBinding.networking.ingress }}
+    - from:
+      {{- range .from }}
+      {{- if .securityGroup }}
+      - securityGroup:
+          groupID: {{ .securityGroup.groupID }}
+      {{- end }}
+      {{- end }}
+      ports:
+      {{- range .ports }}
+      - protocol: {{ .protocol }}
+        port: {{ .port }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}

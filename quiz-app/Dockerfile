@@ -3,8 +3,8 @@ FROM python:3.11-slim AS build-stage
 WORKDIR /app
 
 # Copy website source code and requirements.txt
-COPY source_code/ /app/
-COPY requirements.txt /app/
+COPY src/ /app/
+COPY src/requirements.txt /app/
 
 # Install dependencies to a local user directory
 RUN pip install --no-cache-dir --user -r requirements.txt
@@ -23,4 +23,7 @@ COPY --from=build-stage /app /app
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "3", "application:app"]
+# Change to python directory so imports work correctly
+WORKDIR /app/python
+
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "3", "main:app"]

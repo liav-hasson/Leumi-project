@@ -11,7 +11,6 @@ source "$SCRIPT_DIR/lib/monitor/utilities.sh"
 declare -A LOG_FILES=(
     ["main"]="$MAIN_LOG_FILE"
     ["terraform"]="$TERRAFORM_LOG_FILE"
-    ["kubespray"]="$KUBESPRAY_LOG_FILE"
     ["bootstrap"]="$BOOTSTRAP_LOG_FILE"
     ["helm"]="$HELM_LOG_FILE"
     ["argocd"]="$ARGOCD_LOG_FILE"
@@ -20,13 +19,12 @@ declare -A LOG_FILES=(
 declare -A LOG_DESCRIPTIONS=(
     ["main"]="Main Orchestrator"
     ["terraform"]="Terraform Operations"
-    ["kubespray"]="Kubespray Provisioning"
     ["bootstrap"]="Bootstrap Scripts"
     ["helm"]="Helm Deployments"
     ["argocd"]="ArgoCD Updates"
 )
 
-LOG_SEQUENCE=("main" "terraform" "kubespray" "bootstrap" "helm" "argocd")
+LOG_SEQUENCE=("main" "terraform" "bootstrap" "helm" "argocd")
 
 main() {
     local action="follow"

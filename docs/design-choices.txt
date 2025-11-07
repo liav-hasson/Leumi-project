@@ -1,0 +1,56 @@
+* draft document
+
+A big issue i encounter when working with terraform and kubernetes, is the management of multiple API sources, and resource responsibilty.
+
+the general rules i try to follow are these:
+- let terraform create all infrastructure.
+- let kubernets configure clusters using gitops.
+- use the least amount of scripting, terraform data / local exec blocks.
+
+that is good in theory, but once accutally creating resources in prcatice, several issues happen, and i must bridge the gap between terraform - kubernetes API. some common questions i ask myself:
+
+- who controls the cluster load balancers? 
+- how do we pass data from one to another?
+- how to avoid "chicken and egg situations"?
+- where is the line drawn between terrafrom and kubernetes?
+
+example case: creating a load balancer for a kubernetes service:
+
+1. terraform API case: 
+
+    the load balancer, lets say an ALB, is created before kubernetes configuration, and it makes it easy to link it to terrafrom resources, such as route53.
+
+    but it leads to the question: how do we let kubernetes resources actually use that ALB?
+
+    
+        a. TargetGroupBinding 
+
+            - TGB is a CRD, provided by the AWS load balancer controller.
+            - it lets terraform create the ALB itself, and allows kubernetes to manage the backend targets, dynamically.
+            - a good, probably simplest solution. only downside: not gitops friendly
+        
+        b. tag matching:
+            
+            - when matching ALB labels between terraform and argocd, the load balancer controller can see that the ALB already exist, and wont create another one. 
+            - trying to "trick" the ALB load balancer controller to think it created the ALB.
+            - i dont recommend, unstable and can lead to many issues that requires manual patching (for example, default security groups mismatch)
+            
+
+2. kubernets API case: 
+
+    letting the cloud load balancer controller to create the ALB after terraform finishes makes it easy to link the load balancer to cluster resources, but leads to problems:
+
+    how do i get route53 to be attached to the ALB?
+
+        a. terraform data sources
+
+            how is that triggers in the correct timing once the ALB is created
+
+        b. external-dns kubernetes controller
+
+            gitops heavy
+
+
+personal answer and learning takeaway
+
+- from my research, the desicion you should take depends on your use case of the cluster, and the specific environment circumstances.

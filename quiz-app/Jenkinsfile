@@ -56,8 +56,6 @@ pipeline {
         GIT_USER_EMAIL        = "jenkins@weatherapp.local"
     }
 
-    // IMAGE_TAG will be set during the Prepare stage. BUILD_TAG (date-based) remains available.
-
     stages {
         stage('Prepare image version') {
             steps {

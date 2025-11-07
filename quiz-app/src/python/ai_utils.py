@@ -2,9 +2,15 @@ from openai import OpenAI
 import os
 import boto3
 
-ssm = boto3.client('ssm')
-response = ssm.get_parameter(Name='/devops-quiz/openai-api-key', WithDecryption=True)
-api_key = response['Parameter']['Value']
+# Try to get API key from environment variable first (Kubernetes with External Secrets)
+# Fall back to SSM Parameter Store for local development
+api_key = os.environ.get('OPENAI_API_KEY')
+if not api_key:
+    ssm = boto3.client('ssm')
+    response = ssm.get_parameter(Name='/devops-quiz/openai-api-key', WithDecryption=True)
+    api_key = response['Parameter']['Value']
+
+client = OpenAI(api_key=api_key)
 
 def generate_question(category, keyword, difficulty):
     """Generate a question for a keyword and difficulty level."""

@@ -56,6 +56,7 @@ module "alb" {
   cluster_name               = var.cluster_name
   vpc_id                     = var.vpc_id
   public_subnet_ids          = var.public_subnets
+  certificate_arn            = var.certificate_arn
   common_tags                = var.tags
   enable_deletion_protection = false
 

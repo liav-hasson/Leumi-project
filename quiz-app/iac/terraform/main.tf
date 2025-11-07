@@ -74,6 +74,7 @@ module "prod_cluster" {
   cluster_name       = var.eks_cluster_name
   kubernetes_version = var.kubernetes_version
   node_groups        = var.eks_node_groups
+  certificate_arn    = "arn:aws:acm:eu-north-1:610964304971:certificate/d45cf518-4b6d-4028-9942-30f90d104aa6"
 
   # Cross-module security group references
   jenkins_security_group_id = module.security_groups.jenkins_security_group_id

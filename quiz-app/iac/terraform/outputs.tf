@@ -134,6 +134,11 @@ output "alb_security_group_id" {
   value       = module.prod_cluster.alb_security_group_id
 }
 
+output "quiz_app_target_group_arn" {
+  description = "ARN of the quiz app target group for TargetGroupBinding"
+  value       = module.prod_cluster.quiz_app_target_group_arn
+}
+
 # =============================================================================
 # DNS & Certificate Outputs
 # =============================================================================

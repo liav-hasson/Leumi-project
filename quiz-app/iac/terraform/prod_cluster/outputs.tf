@@ -91,3 +91,8 @@ output "alb_security_group_id" {
   description = "Security group ID of the ALB"
   value       = module.alb.alb_security_group_id
 }
+
+output "quiz_app_target_group_arn" {
+  description = "ARN of the quiz app target group for TargetGroupBinding"
+  value       = module.alb.quiz_app_target_group_arn
+}

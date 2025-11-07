@@ -58,6 +58,11 @@ variable "public_subnets" {
   type        = list(string)
 }
 
+variable "certificate_arn" {
+  description = "ARN of the ACM certificate for HTTPS listener"
+  type        = string
+}
+
 // Removed app_namespace and create_kubernetes_resources: Kubernetes resources handled by Helm now.
 
 # Removed kubernetes_security_group_id - no longer needed for kubespray EKS access

@@ -44,30 +44,27 @@ serviceAccount:
   annotations: {}
   name: ""
 
-# Ingress for external access
+# Ingress - DISABLED (using TargetGroupBinding instead)
 ingress:
+  enabled: false
+
+# TargetGroupBinding for AWS ALB integration
+targetGroupBinding:
   enabled: true
-  # Production uses AWS Load Balancer Controller (ALB)
-  className: "alb"  # Static: AWS Load Balancer Controller
-  annotations:
-    kubernetes.io/ingress.class: "alb"
-    # Use existing ALB created by Terraform instead of creating a new one
-    alb.ingress.kubernetes.io/load-balancer-name: "devops-quiz-eks-alb"
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
-    alb.ingress.kubernetes.io/ssl-redirect: '443'  # Redirect HTTP to HTTPS
-    alb.ingress.kubernetes.io/healthcheck-path: "/"
-    # Certificate ARN created by Terraform (route53 module with DNS validation)
-    # After terraform apply, update this with: terraform output acm_certificate_arn
-    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:eu-north-1:610964304971:certificate/d45cf518-4b6d-4028-9942-30f90d104aa6"
-    alb.ingress.kubernetes.io/group.name: "quiz-weatherlabs"
-  hosts:
-    - host: "quiz.weatherlabs.org"
-      paths:
-        - path: /
-          pathType: Prefix
-          servicePort: 5000
+  # Target Group ARN from Terraform output
+  targetGroupARN: "arn:aws:elasticloadbalancing:eu-north-1:610964304971:targetgroup/devops-quiz-eks-quiz-app-tg/a4a373dc289813e0"
+  serviceRef:
+    name: "quiz-app"
+    port: 5000
+  targetType: "ip"
+  networking:
+    ingress:
+      - from:
+          - securityGroup:
+              groupID: "sg-018be5812447b3bd0"  # ALB security group from Terraform
+        ports:
+          - protocol: TCP
+            port: 5000
 
 # Resource limits and requests
 resources:
