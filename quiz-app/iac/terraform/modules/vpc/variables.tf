@@ -57,4 +57,9 @@ variable "nat_volume_size" {
   type        = number
 }
 
+variable "eks_cluster_name" {
+  description = "EKS cluster name for subnet tagging"
+  type        = string
+}
+
 # (removed duplicate NAT variables)

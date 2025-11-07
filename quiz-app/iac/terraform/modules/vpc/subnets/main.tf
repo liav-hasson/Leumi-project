@@ -16,11 +16,8 @@ resource "aws_subnet" "public" {
       Project     = var.project_name
       # AWS Load Balancer Controller tags for ALB subnet discovery
       "kubernetes.io/role/elb" = "1"
-    },
-    # Tag for all clusters in this VPC (both dev kubespray and prod EKS)
-    {
-      "kubernetes.io/cluster/weatherapp-dev-cluster" = "shared"
-      "kubernetes.io/cluster/weatherapp-prod-eks"    = "shared"
+      # Tag for EKS cluster
+      "kubernetes.io/cluster/${var.eks_cluster_name}" = "shared"
     }
   )
 }
@@ -41,11 +38,8 @@ resource "aws_subnet" "private" {
       Project     = var.project_name
       # AWS Load Balancer Controller tags for internal ALB subnet discovery
       "kubernetes.io/role/internal-elb" = "1"
-    },
-    # Tag for all clusters in this VPC (both dev kubespray and prod EKS)
-    {
-      "kubernetes.io/cluster/weatherapp-dev-cluster" = "shared"
-      "kubernetes.io/cluster/weatherapp-prod-eks"    = "shared"
+      # Tag for EKS cluster
+      "kubernetes.io/cluster/${var.eks_cluster_name}" = "shared"
     }
   )
 }

@@ -16,6 +16,7 @@ module "vpc" {
   nat_ami_id            = var.nat_ami_id
   nat_instance_type     = var.nat_instance_type
   nat_volume_size       = var.nat_volume_size
+  eks_cluster_name      = var.eks_cluster_name
 }
 
 # IAM Module

@@ -148,25 +148,21 @@ variable "kubernetes_security_group_name" {
 variable "alb_service_account_name" {
   description = "Name of the service account for AWS Load Balancer Controller"
   type        = string
-  default     = "aws-load-balancer-controller"
 }
 
 variable "alb_service_account_namespace" {
   description = "Namespace for AWS Load Balancer Controller service account"
   type        = string
-  default     = "bootstrap-prod"
 }
 
 variable "eso_service_account_name" {
   description = "Name of the service account for External Secrets Operator"
   type        = string
-  default     = "external-secrets"
 }
 
 variable "eso_service_account_namespace" {
   description = "Namespace for External Secrets Operator service account"
   type        = string
-  default     = "bootstrap-prod"
 }
 
 # =============================================================================

@@ -133,3 +133,31 @@ output "alb_security_group_id" {
   description = "Security group ID of the ALB"
   value       = module.prod_cluster.alb_security_group_id
 }
+
+# =============================================================================
+# DNS & Certificate Outputs
+# =============================================================================
+
+output "acm_certificate_arn" {
+  description = "ARN of the ACM certificate for HTTPS (if public zone enabled)"
+  value       = module.route53.acm_certificate_arn
+}
+
+output "quiz_app_url" {
+  description = "Public URL for quiz application"
+  value       = module.route53.quiz_app_url
+}
+
+output "argocd_url" {
+  description = "Public URL for ArgoCD"
+  value       = module.route53.argocd_url
+}
+
+# =============================================================================
+# General Outputs
+# =============================================================================
+
+output "region" {
+  description = "AWS region where resources are deployed"
+  value       = var.aws_region
+}

@@ -29,3 +29,8 @@ variable "project_name" {
   type        = string
   default     = "weatherapp"
 }
+
+variable "eks_cluster_name" {
+  description = "EKS cluster name for subnet tagging"
+  type        = string
+}

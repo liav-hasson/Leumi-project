@@ -31,6 +31,7 @@ module "subnets" {
   private_subnet_cidrs = var.private_subnet_cidrs
   environment          = var.environment
   project_name         = var.project_name
+  eks_cluster_name     = var.eks_cluster_name
 }
 
 # NAT Instance (Cost-optimized replacement for NAT Gateway)
