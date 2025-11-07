@@ -10,13 +10,13 @@ spec:
   serviceRef:
     name: argocd-server
     port: 443
-  targetGroupARN: PLACEHOLDER_ARGOCD_TARGET_GROUP_ARN
+  targetGroupARN: arn:aws:elasticloadbalancing:eu-north-1:610964304971:targetgroup/devops-quiz-eks-argocd-tg/e16442c78237852b
   targetType: ip
   networking:
     ingress:
       - from:
           - securityGroup:
-              groupID: PLACEHOLDER_ALB_SECURITY_GROUP_ID
+              groupID: sg-0277e331e21718f10
         ports:
           - protocol: TCP
             port: 443
