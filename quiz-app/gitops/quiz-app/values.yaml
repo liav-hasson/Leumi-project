@@ -52,14 +52,14 @@ ingress:
 targetGroupBinding:
   enabled: true
   # Target Group ARN from Terraform output
-  targetGroupARN: "PLACEHOLDER_TARGET_GROUP_ARN"
+  targetGroupARN: "arn:aws:elasticloadbalancing:eu-north-1:610964304971:targetgroup/devops-quiz-eks-quiz-app-tg/6cd7c2c417318cea"
   serviceRef:
     name: "quiz-app"
   networking:
     ingress:
       - from:
           - securityGroup:
-              groupID: "PLACEHOLDER_ALB_SECURITY_GROUP_ID"
+              groupID: "sg-0277e331e21718f10"
         ports:
           - protocol: TCP
             port: 5000
