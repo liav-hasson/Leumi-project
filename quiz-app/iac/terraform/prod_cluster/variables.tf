@@ -53,6 +53,11 @@ variable "jenkins_security_group_id" {
   default     = null
 }
 
+variable "jenkins_instance_id" {
+  description = "EC2 instance ID of the Jenkins server (for ALB target group attachment)"
+  type        = string
+}
+
 variable "public_subnets" {
   description = "List of public subnet IDs for ALB"
   type        = list(string)

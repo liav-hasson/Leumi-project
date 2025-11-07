@@ -102,6 +102,7 @@ module "prod_cluster" {
 
   # Cross-module security group references
   jenkins_security_group_id = module.security_groups.jenkins_security_group_id
+  jenkins_instance_id       = module.jenkins.instance_id
 
   # Tags
   tags = merge(
