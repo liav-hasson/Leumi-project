@@ -139,6 +139,11 @@ output "quiz_app_target_group_arn" {
   value       = module.prod_cluster.quiz_app_target_group_arn
 }
 
+output "argocd_target_group_arn" {
+  description = "ARN of the ArgoCD target group for TargetGroupBinding"
+  value       = module.prod_cluster.argocd_target_group_arn
+}
+
 # =============================================================================
 # DNS & Certificate Outputs
 # =============================================================================

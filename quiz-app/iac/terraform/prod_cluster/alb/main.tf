@@ -127,6 +127,36 @@ resource "aws_lb_target_group" "quiz_app" {
   )
 }
 
+# ArgoCD Target Group (managed via TargetGroupBinding)
+resource "aws_lb_target_group" "argocd" {
+  name        = "${var.project_name}-argocd-tg"
+  port        = 443
+  protocol    = "HTTPS"
+  vpc_id      = var.vpc_id
+  target_type = "ip"  # Required for EKS with IP mode
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 5
+    interval            = 30
+    path                = "/healthz"
+    protocol            = "HTTPS"
+    matcher             = "200"
+    port                = "traffic-port"
+  }
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.project_name}-argocd-tg"
+      # Required for TargetGroupBinding to discover this target group
+      "elbv2.k8s.aws/cluster" = var.cluster_name
+    }
+  )
+}
+
 # HTTP Listener (redirects to HTTPS)
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
@@ -184,6 +214,30 @@ resource "aws_lb_listener_rule" "quiz_app" {
     var.common_tags,
     {
       Name = "${var.project_name}-quiz-app-rule"
+    }
+  )
+}
+
+# HTTPS Listener Rule for ArgoCD
+resource "aws_lb_listener_rule" "argocd" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 200
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.argocd.arn
+  }
+
+  condition {
+    host_header {
+      values = ["argocd.weatherlabs.org"]
+    }
+  }
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.project_name}-argocd-rule"
     }
   )
 }

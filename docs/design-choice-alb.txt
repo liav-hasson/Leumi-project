@@ -7,7 +7,8 @@ the general rules i try to follow are these:
 - let kubernets configure clusters using gitops.
 - use the least amount of scripting, terraform data / local exec blocks.
 
-that is good in theory, but once accutally creating resources in prcatice, several issues happen, and i must bridge the gap between terraform - kubernetes API. some common questions i ask myself:
+that is good in theory, but once accutally creating resources in prcatice, several issues happen, and you must bridge the gap between terraform - kubernetes API. 
+some questions i ask myself:
 
 - who controls the cluster load balancers? 
 - how do we pass data from one to another?
@@ -18,22 +19,25 @@ example case: creating a load balancer for a kubernetes service:
 
 1. terraform API case: 
 
-    the load balancer, lets say an ALB, is created before kubernetes configuration, and it makes it easy to link it to terrafrom resources, such as route53.
+    the load balancer, lets say an ALB, is created before kubernetes configuration. 
+    it makes it easy to link it to other terrafrom resources, such as route53.
 
     but it leads to the question: how do we let kubernetes resources actually use that ALB?
-
     
-        a. TargetGroupBinding 
+        a. TargetGroupBinding (chosen approach)
 
             - TGB is a CRD, provided by the AWS load balancer controller.
             - it lets terraform create the ALB itself, and allows kubernetes to manage the backend targets, dynamically.
-            - a good, probably simplest solution. only downside: not gitops friendly
+            - it is a good, simple solution. only downside: not the most gitops friendly.
+            - forces you to deal with finalizers when destroying infra, since the target groups are in terraform, not by the kubernetes controller.
         
         b. tag matching:
             
             - when matching ALB labels between terraform and argocd, the load balancer controller can see that the ALB already exist, and wont create another one. 
             - trying to "trick" the ALB load balancer controller to think it created the ALB.
             - i dont recommend, unstable and can lead to many issues that requires manual patching (for example, default security groups mismatch)
+
+        c. 
             
 
 2. kubernets API case: 
@@ -44,13 +48,12 @@ example case: creating a load balancer for a kubernetes service:
 
         a. terraform data sources
 
-            how is that triggers in the correct timing once the ALB is created
+            for example, when wanting to give the ALB a route53 domain that is created in terraform.
+            we can use a data source to wait for the kubernetes controller to finish creating the ALB.
+            the big downside is complex timing management for the data block execution.
 
         b. external-dns kubernetes controller
 
-            gitops heavy
+            gitops heavy, but a proper solution.
 
-
-personal answer and learning takeaway
-
-- from my research, the desicion you should take depends on your use case of the cluster, and the specific environment circumstances.
+        c. 

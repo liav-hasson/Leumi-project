@@ -1,0 +1,18 @@
+* draft document
+
+explaining the bash scripts structure i use for this project.
+imprtand note! the scripts are buggy and have issues, and i will try to address them over time.
+
+- the purpose of the scripts is to provide utilities, and make the workflow easy.
+
+- they are structured to be moveable, so they can run on any machine that pulls the source code. 
+* they are dependent on the project architecture and relative paths
+
+- the main 3 scripts are:
+    1. manage-project.sh        # starts and deletes the project
+    2. monitor-deployment.sh    # a monitor and logger script
+    3. project-utils.sh         # friendly management interface
+    * go to "/home/liav/github/Leumi-project/quiz-app/iac/scripts"
+for a demonstration.
+
+- the scripts use helpers that source each other, for easier management.

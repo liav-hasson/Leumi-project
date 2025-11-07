@@ -1,3 +1,4 @@
+### Partial list - to update later! ###
 # Quiz App Project Dependencies
 
 ## CLI Tools (Required)

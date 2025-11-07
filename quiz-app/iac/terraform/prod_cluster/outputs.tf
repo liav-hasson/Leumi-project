@@ -96,3 +96,8 @@ output "quiz_app_target_group_arn" {
   description = "ARN of the quiz app target group for TargetGroupBinding"
   value       = module.alb.quiz_app_target_group_arn
 }
+
+output "argocd_target_group_arn" {
+  description = "ARN of the ArgoCD target group for TargetGroupBinding"
+  value       = module.alb.argocd_target_group_arn
+}

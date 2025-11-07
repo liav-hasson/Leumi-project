@@ -27,3 +27,8 @@ output "quiz_app_target_group_arn" {
   description = "ARN of the quiz app target group for TargetGroupBinding"
   value       = aws_lb_target_group.quiz_app.arn
 }
+
+output "argocd_target_group_arn" {
+  description = "ARN of the ArgoCD target group for TargetGroupBinding"
+  value       = aws_lb_target_group.argocd.arn
+}
