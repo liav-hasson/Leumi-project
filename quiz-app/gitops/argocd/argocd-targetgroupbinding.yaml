@@ -1,0 +1,22 @@
+---
+# TargetGroupBinding for ArgoCD
+# Connects ArgoCD service to ALB target group for HTTPS access
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: argocd-tgb
+  namespace: argocd
+spec:
+  serviceRef:
+    name: argocd-server
+    port: 443
+  targetGroupARN: PLACEHOLDER_ARGOCD_TARGET_GROUP_ARN
+  targetType: ip
+  networking:
+    ingress:
+      - from:
+          - securityGroup:
+              groupID: PLACEHOLDER_ALB_SECURITY_GROUP_ID
+        ports:
+          - protocol: TCP
+            port: 443
