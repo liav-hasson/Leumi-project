@@ -51,14 +51,15 @@ ingress:
   className: "alb"  # Static: AWS Load Balancer Controller
   annotations:
     kubernetes.io/ingress.class: "alb"
+    # Use existing ALB created by Terraform instead of creating a new one
+    alb.ingress.kubernetes.io/load-balancer-name: "devops-quiz-eks-alb"
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
     alb.ingress.kubernetes.io/ssl-redirect: '443'  # Redirect HTTP to HTTPS
     alb.ingress.kubernetes.io/healthcheck-path: "/"
     # Certificate ARN created by Terraform (route53 module with DNS validation)
-    # After terraform apply, update this with: terraform output acm_certificate_arn
-    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:eu-north-1:ACCOUNT_ID:certificate/CERT_ID"
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:eu-north-1:610964304971:certificate/d45cf518-4b6d-4028-9942-30f90d104aa6"
     alb.ingress.kubernetes.io/group.name: "quiz-weatherlabs"
   hosts:
     - host: "quiz.weatherlabs.org"
