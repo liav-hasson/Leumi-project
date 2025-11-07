@@ -97,47 +97,7 @@ resource "aws_acm_certificate_validation" "main" {
   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
 }
 
-# Public DNS: quiz.yourdomain.com → Quiz App ALB
-resource "aws_route53_record" "quiz_app" {
-  count = var.public_zone_enabled ? 1 : 0
-  
-  zone_id = data.aws_route53_zone.public[0].zone_id
-  name    = var.quiz_app_subdomain
-  type    = "A"
-
-  alias {
-    name                   = var.alb_dns_name
-    zone_id                = var.alb_zone_id
-    evaluate_target_health = true
-  }
-}
-
-# Public DNS: argocd.yourdomain.com → ALB (ArgoCD ingress)
-resource "aws_route53_record" "argocd" {
-  count = var.public_zone_enabled ? 1 : 0
-  
-  zone_id = data.aws_route53_zone.public[0].zone_id
-  name    = var.argocd_subdomain
-  type    = "A"
-
-  alias {
-    name                   = var.alb_dns_name
-    zone_id                = var.alb_zone_id
-    evaluate_target_health = true
-  }
-}
-
-# Public DNS: jenkins.yourdomain.com → ALB (Jenkins EC2)
-resource "aws_route53_record" "jenkins_public" {
-  count = var.public_zone_enabled ? 1 : 0
-  
-  zone_id = data.aws_route53_zone.public[0].zone_id
-  name    = var.jenkins_subdomain
-  type    = "A"
-
-  alias {
-    name                   = var.alb_dns_name
-    zone_id                = var.alb_zone_id
-    evaluate_target_health = true
-  }
-}
+# ALB DNS records moved to main.tf to break circular dependency
+# This module now only handles:
+# - Private hosted zone records (Jenkins internal DNS)
+# - ACM certificate creation (independent of ALB)

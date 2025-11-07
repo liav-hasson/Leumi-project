@@ -72,9 +72,23 @@ destroy_cleanup_eks_cluster() {
         done
     fi
     
-    # Step 2: Remove ALL finalizers that could block deletion
-    # These finalizers try to manage Terraform resources or have cross-app dependencies
+    # Step 2: Delete ArgoCD applications FIRST to stop them from recreating resources
+    log_info "Removing finalizers from ArgoCD applications..."
+    kubectl get applications -n argocd -o json 2>/dev/null | \
+        jq -r '.items[].metadata.name' | \
+        while read -r app; do
+            kubectl patch application "$app" -n argocd -p '{"metadata":{"finalizers":[]}}' --type=merge 2>&1 | tee -a "$HELM_LOG_FILE" || true
+        done
     
+    log_info "Deleting ArgoCD applications to stop resource reconciliation..."
+    kubectl delete applications --all -n argocd --timeout=30s 2>&1 | tee -a "$HELM_LOG_FILE" || {
+        log_warning "Failed to delete some ArgoCD applications"
+    }
+    
+    # Wait a moment for ArgoCD to stop reconciling
+    sleep 5
+    
+    # Step 3: Now remove finalizers from resources (ArgoCD won't recreate them anymore)
     log_info "Removing finalizers from TargetGroupBindings..."
     kubectl get targetgroupbindings -A -o json 2>/dev/null | \
         jq -r '.items[] | "\(.metadata.namespace) \(.metadata.name)"' | \
@@ -100,20 +114,7 @@ destroy_cleanup_eks_cluster() {
             fi
         done
     
-    # Step 3: Remove ArgoCD application finalizers, then delete
-    log_info "Removing finalizers from ArgoCD applications..."
-    kubectl get applications -n argocd -o json 2>/dev/null | \
-        jq -r '.items[].metadata.name' | \
-        while read -r app; do
-            kubectl patch application "$app" -n argocd -p '{"metadata":{"finalizers":[]}}' --type=merge 2>&1 | tee -a "$HELM_LOG_FILE" || true
-        done
-    
-    log_info "Deleting ArgoCD applications..."
-    kubectl delete applications --all -n argocd --timeout=30s 2>&1 | tee -a "$HELM_LOG_FILE" || {
-        log_warning "Failed to delete some ArgoCD applications"
-    }
-
-    # Uninstall ArgoCD (no longer managing anything)
+    # Step 4: Uninstall ArgoCD (applications already deleted, finalizers removed)
     log_info "Uninstalling ArgoCD..."
     helm uninstall argocd -n argocd --timeout=5m 2>&1 | tee -a "$HELM_LOG_FILE" || {
         log_warning "Failed to uninstall ArgoCD"

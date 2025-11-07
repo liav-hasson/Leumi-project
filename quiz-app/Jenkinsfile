@@ -39,21 +39,26 @@ pipeline {
         // Generates DOCKERHUB_CREDENTIALS_USR, DOCKERHUB_CREDENTIALS_PSW
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         
-        // Used for GitLab repository access (clone, push to ArgoCD repo)
-        // Generates GIT_CREDENTIALS_USR, GIT_CREDENTIALS_PSW
-        GIT_CREDENTIALS       = credentials('git-credentials')
+        // Used for GitHub repository access (clone, push to GitOps repo)
+        // Generates GITHUB_CREDENTIALS_USR, GITHUB_CREDENTIALS_PSW
+        GITHUB_CREDENTIALS    = credentials('github-credentials')
         
-        // Used for GitLab API calls 
-        // (commit status updates, merge request operations)
-        GITLAB_API_TOKEN      = credentials('jenkins-api-token')
+        // Used for GitHub API calls (commit status updates)
+        // This is a GitHub Personal Access Token with repo scope
+        GITHUB_TOKEN          = credentials('github-token')
         
         // Container signing password (key files handled in withCredentials blocks)
         COSIGN_PASSWORD       = credentials('cosign-password')
         
-        // GitOps Configuration for jenkins
-        ARGOCD_REPO_URL       = "http://${GIT_CREDENTIALS_USR}:${GIT_CREDENTIALS_PSW}@gitlab.weatherlabs.internal/root/argocd.git"
+        // GitOps Configuration
+        // GitHub repository for this application
+        GITHUB_REPO           = "liav-hasson/Leumi-project"
+        GITHUB_REPO_URL       = "https://github.com/${GITHUB_REPO}.git"
+        
+        // GitOps repository URL (will use GITHUB_CREDENTIALS for auth)
+        ARGOCD_REPO_URL       = "https://${GITHUB_CREDENTIALS_USR}:${GITHUB_CREDENTIALS_PSW}@github.com/${GITHUB_REPO}.git"
         GIT_USER_NAME         = "Jenkins Pipeline"
-        GIT_USER_EMAIL        = "jenkins@weatherapp.local"
+        GIT_USER_EMAIL        = "jenkins@weatherlabs.org"
     }
 
     stages {
@@ -67,7 +72,7 @@ pipeline {
                     env.IMAGE_TAG = env.BUILD_TAG
 
                     // Compute semantic version and set env for the rest of pipeline
-                    def semver = sh(returnStdout: true, script: './scripts/compute_next_version.sh . auto').trim()
+                    def semver = sh(returnStdout: true, script: './src/scripts/compute_next_version.sh . auto').trim()
                     if (semver) {
                         echo "Computed semantic version: ${semver}"
                         env.IMAGE_TAG = semver
@@ -90,24 +95,24 @@ pipeline {
                 echo '--------- Starting checkout and testing ---------'
 
                 echo '--------- Running pylint test ---------'
-                sh 'pylint source_code/application.py --score=yes --fail-under=5.0'
-                sh 'pylint source_code/app_funcs.py --score=yes --fail-under=5.0'
+                sh 'pylint src/python/main.py --score=yes --fail-under=5.0'
+                sh 'pylint src/python/quiz_utils.py --score=yes --fail-under=5.0'
+                sh 'pylint src/python/ai_utils.py --score=yes --fail-under=5.0'
                 echo 'Pylint checks passed!'
 
-                echo '--------- Running unit tests ---------'
-                sh 'cd source_code && python3 -m pytest ../tests/test_website.py -v'
-                echo 'Unit tests passed!'
+                echo '--------- Skipping unit tests (no tests directory) ---------'
+                echo 'Unit tests stage skipped - add tests in future'
 
                 echo '--------- Running dependency vulnerability scan ---------'
                 sh '''
                     # Run safety check on production dependencies only
-                    # Focus on requirements.txt (production dependencies)
+                    # Focus on src/requirements.txt (production dependencies)
                     # Exit code 64 means vulnerabilities found, 0 means clean
-                    safety check --json --file requirements.txt || {
+                    safety check --json --file src/requirements.txt || {
                         if [ $? -eq 64 ]; then
                             echo "CRITICAL: Vulnerabilities found in production dependencies!"
-                            echo "Pipeline failed due to security vulnerabilities in requirements.txt"
-                            safety check --file requirements.txt --output text
+                            echo "Pipeline failed due to security vulnerabilities in src/requirements.txt"
+                            safety check --file src/requirements.txt --output text
                             exit 1
                         else
                             echo "Safety check failed with unexpected error"
@@ -132,11 +137,11 @@ pipeline {
                 sh '''
                     # Run Bandit security analysis on Python source code
                     echo "Scanning Python code with Bandit..."
-                    bandit -r source_code/ -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
+                    bandit -r src/python/ -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
                     
                     # Display results in human-readable format  
                     echo "Bandit scan results:"
-                    bandit -r source_code/ -f txt || true
+                    bandit -r src/python/ -f txt || true
                     
                     # Check if high/medium severity issues found (exit codes 1-2)
                     if [ "${BANDIT_EXIT_CODE:-0}" -eq 1 ] || [ "${BANDIT_EXIT_CODE:-0}" -eq 2 ]; then
@@ -204,14 +209,14 @@ pipeline {
                         echo "Connecting to BuildKit DaemonSet..."
                         export BUILDKIT_HOST=tcp://buildkitd.jenkins.svc.cluster.local:1234
 
-                        echo "Building weather-app image with buildctl..."
+                        echo "Building quiz-app image with buildctl..."
                         buildctl --addr ${BUILDKIT_HOST} build \
                             --frontend dockerfile.v0 \
                             --local context=. \
                             --local dockerfile=. \
-                            --output type=image,name=${DOCKERHUB_CREDENTIALS_USR}/weather-app:${IMAGE_TAG},push=true
+                            --output type=image,name=${DOCKERHUB_CREDENTIALS_USR}/quiz-app:${IMAGE_TAG},push=true
                         
-                        echo "Image ${DOCKERHUB_CREDENTIALS_USR}/weather-app:${IMAGE_TAG} built and pushed"
+                        echo "Image ${DOCKERHUB_CREDENTIALS_USR}/quiz-app:${IMAGE_TAG} built and pushed"
                     '''
                 }
             }
@@ -233,7 +238,7 @@ pipeline {
                     ]) {
                         sh '''
                             # Sign the container image using Cosign with private key
-                            IMAGE_NAME="${DOCKERHUB_CREDENTIALS_USR}/weather-app:${IMAGE_TAG}"
+                            IMAGE_NAME="${DOCKERHUB_CREDENTIALS_USR}/quiz-app:${IMAGE_TAG}"
                             
                             echo "Signing image: ${IMAGE_NAME}"
                             
@@ -276,7 +281,7 @@ pipeline {
                     ]) {
                         sh '''
                             # Verify the container signature using Cosign with public key
-                            IMAGE_NAME="${DOCKERHUB_CREDENTIALS_USR}/weather-app:${IMAGE_TAG}"
+                            IMAGE_NAME="${DOCKERHUB_CREDENTIALS_USR}/quiz-app:${IMAGE_TAG}"
                             
                             echo "Verifying signature for image: ${IMAGE_NAME}"
                             cosign verify --key "${COSIGN_PUBLIC_KEY_FILE}" "${IMAGE_NAME}" || {
@@ -348,13 +353,13 @@ pipeline {
                 def statusIcon = env.PIPELINE_STATUS == "SUCCESS" ? "✅" : "❌"
                 def color = env.PIPELINE_STATUS == "SUCCESS" ? "good" : "danger"
                 def slackMessage = env.PIPELINE_STATUS == "SUCCESS" ? 
-                    "✅ GitOps update completed! Sync argo CD to deploy!." : 
+                    "✅ GitOps update completed! Sync ArgoCD to deploy!" : 
                     "❌ Pipeline failed - check logs for details"
                 def finalMessage = [
                     "${statusIcon} GitOps Pipeline *${env.JOB_NAME}* #${env.BUILD_NUMBER} ${env.PIPELINE_STATUS}",
                     "",
-                    "*Docker Image:* ${env.DOCKERHUB_CREDENTIALS_USR}/weather-app:${env.IMAGE_TAG}",
-                    "*GitOps Repo:* argocd-repo updated",
+                    "*Docker Image:* ${env.DOCKERHUB_CREDENTIALS_USR}/quiz-app:${env.IMAGE_TAG}",
+                    "*GitOps Repo:* GitHub repository updated",
                     "*Deployment:* ArgoCD will sync automatically", 
                     "${slackMessage}"
                 ].join('\n')
@@ -366,15 +371,20 @@ pipeline {
                 )
             }
 
-            // Report status back to GitLab using API token
+            // Report status back to GitHub using Commit Status API
             script {
-                def status = env.PIPELINE_STATUS == "SUCCESS" ? "success" : "failed"
+                def status = env.PIPELINE_STATUS == "SUCCESS" ? "success" : "failure"
+                def description = env.PIPELINE_STATUS == "SUCCESS" ? 
+                    "Jenkins build passed" : 
+                    "Jenkins build failed"
+                    
                 sh """
                     curl -X POST \
-                        -H "PRIVATE-TOKEN: \${GITLAB_API_TOKEN}" \
+                        -H "Authorization: token \${GITHUB_TOKEN}" \
+                        -H "Accept: application/vnd.github.v3+json" \
                         -H "Content-Type: application/json" \
-                        -d '{"state":"${status}","target_url":"${BUILD_URL}","description":"Jenkins Pipeline"}' \
-                        "http://gitlab.weatherlabs.internal/api/v4/projects/1/statuses/${env.GIT_COMMIT}"
+                        -d '{"state":"${status}","target_url":"${BUILD_URL}","description":"${description}","context":"continuous-integration/jenkins"}' \
+                        "https://api.github.com/repos/${GITHUB_REPO}/statuses/${env.GIT_COMMIT}"
                 """
             }
         }

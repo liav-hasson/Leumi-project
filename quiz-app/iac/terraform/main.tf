@@ -61,6 +61,7 @@ module "jenkins" {
 }
 
 # Route53 DNS & ACM Certificate
+# Note: Public DNS records for ALB services are created AFTER prod_cluster
 module "route53" {
   source = "./modules/route53"
 
@@ -72,15 +73,14 @@ module "route53" {
   environment         = var.environment
   common_tags         = var.common_tags
 
-  # Public DNS & ACM Certificate
+  # Public DNS & ACM Certificate (certificate created independently)
   public_zone_enabled  = var.public_zone_enabled
   public_zone_id       = var.public_zone_id
   public_domain        = var.public_domain
   quiz_app_subdomain   = var.quiz_app_subdomain
   argocd_subdomain     = var.argocd_subdomain
   jenkins_subdomain    = var.jenkins_subdomain
-  alb_dns_name         = try(module.prod_cluster.alb_dns_name, "")
-  alb_zone_id          = try(module.prod_cluster.alb_zone_id, "")
+  # Note: ALB DNS records now created separately in main.tf after prod_cluster
 }
 
 # Production EKS Cluster  
@@ -97,7 +97,7 @@ module "prod_cluster" {
   cluster_name       = var.eks_cluster_name
   kubernetes_version = var.kubernetes_version
   node_groups        = var.eks_node_groups
-  # Use certificate from route53 module - this creates implicit dependency
+  # Certificate from route53 module - Route53 DNS records are now optional if ALB not ready
   certificate_arn    = module.route53.acm_certificate_arn
 
   # Cross-module security group references
@@ -112,4 +112,60 @@ module "prod_cluster" {
       ClusterName = var.eks_cluster_name
     }
   )
+}
+
+# =============================================================================
+# ALB DNS Records (created after cluster to break circular dependency)
+# =============================================================================
+data "aws_route53_zone" "public_for_alb" {
+  count   = var.public_zone_enabled ? 1 : 0
+  zone_id = var.public_zone_id
+}
+
+# Quiz app DNS record
+resource "aws_route53_record" "quiz_app_alb" {
+  count   = var.public_zone_enabled ? 1 : 0
+  zone_id = data.aws_route53_zone.public_for_alb[0].zone_id
+  name    = var.quiz_app_subdomain
+  type    = "A"
+
+  alias {
+    name                   = module.prod_cluster.alb_dns_name
+    zone_id                = module.prod_cluster.alb_zone_id
+    evaluate_target_health = true
+  }
+
+  depends_on = [module.prod_cluster]
+}
+
+# ArgoCD DNS record
+resource "aws_route53_record" "argocd_alb" {
+  count   = var.public_zone_enabled ? 1 : 0
+  zone_id = data.aws_route53_zone.public_for_alb[0].zone_id
+  name    = var.argocd_subdomain
+  type    = "A"
+
+  alias {
+    name                   = module.prod_cluster.alb_dns_name
+    zone_id                = module.prod_cluster.alb_zone_id
+    evaluate_target_health = true
+  }
+
+  depends_on = [module.prod_cluster]
+}
+
+# Jenkins DNS record
+resource "aws_route53_record" "jenkins_alb" {
+  count   = var.public_zone_enabled ? 1 : 0
+  zone_id = data.aws_route53_zone.public_for_alb[0].zone_id
+  name    = var.jenkins_subdomain
+  type    = "A"
+
+  alias {
+    name                   = module.prod_cluster.alb_dns_name
+    zone_id                = module.prod_cluster.alb_zone_id
+    evaluate_target_health = true
+  }
+
+  depends_on = [module.prod_cluster]
 }

@@ -71,15 +71,4 @@ variable "jenkins_subdomain" {
   default     = ""
 }
 
-# ALB (created by Terraform in prod_cluster/alb module)
-variable "alb_dns_name" {
-  description = "DNS name of the ALB"
-  type        = string
-  default     = ""
-}
-
-variable "alb_zone_id" {
-  description = "Hosted zone ID of the ALB"
-  type        = string
-  default     = ""
-}
+# Note: ALB DNS records moved to main.tf to break circular dependency
