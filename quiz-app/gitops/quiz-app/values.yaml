@@ -53,8 +53,10 @@ targetGroupBinding:
   enabled: true
   # Target Group ARN from Terraform output
   targetGroupARN: "arn:aws:elasticloadbalancing:eu-north-1:610964304971:targetgroup/devops-quiz-eks-quiz-app-tg/6cd7c2c417318cea"
+  targetType: ip
   serviceRef:
     name: "quiz-app"
+    port: 5000
   networking:
     ingress:
       - from:
