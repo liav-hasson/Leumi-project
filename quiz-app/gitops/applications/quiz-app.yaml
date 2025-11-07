@@ -21,7 +21,7 @@ spec:
   project: default
   source:
     path: quiz-app/gitops/quiz-app
-    repoURL: https://github.com/liavvv/Leumi-project.git
+    repoURL: https://github.com/liav-hasson/Leumi-project.git
     targetRevision: main
     helm:
       valueFiles:
