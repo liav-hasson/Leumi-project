@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository contains a **3-part DevOps project** showcasing modern DevOps practices, infrastructure as code, and troubleshooting skills.
+This repository has a mono-repo structure, and contains a **3-part DevOps project** showcasing modern DevOps practices, infrastructure as code, and troubleshooting skills.
 
 1. **Part 1: Quiz App Pipeline** – Flask web application with Jenkins CI/CD on Amazon EKS using GitOps (ArgoCD).
 2. **Part 2: Secure Apache Server** – Terraform-provisioned web server with NLB and CloudFront CDN.
