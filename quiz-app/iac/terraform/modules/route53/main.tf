@@ -98,9 +98,8 @@ resource "aws_acm_certificate_validation" "main" {
 }
 
 # Public DNS: quiz.yourdomain.com → Quiz App ALB
-# Only create if ALB DNS is available
 resource "aws_route53_record" "quiz_app" {
-  count = var.public_zone_enabled && var.alb_dns_name != "" ? 1 : 0
+  count = var.public_zone_enabled ? 1 : 0
   
   zone_id = data.aws_route53_zone.public[0].zone_id
   name    = var.quiz_app_subdomain
@@ -114,9 +113,8 @@ resource "aws_route53_record" "quiz_app" {
 }
 
 # Public DNS: argocd.yourdomain.com → ALB (ArgoCD ingress)
-# Only create if ALB DNS is available
 resource "aws_route53_record" "argocd" {
-  count = var.public_zone_enabled && var.alb_dns_name != "" ? 1 : 0
+  count = var.public_zone_enabled ? 1 : 0
   
   zone_id = data.aws_route53_zone.public[0].zone_id
   name    = var.argocd_subdomain
