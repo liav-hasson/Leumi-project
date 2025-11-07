@@ -128,10 +128,11 @@ resource "aws_lb_target_group" "quiz_app" {
 }
 
 # ArgoCD Target Group (managed via TargetGroupBinding)
+# ArgoCD runs HTTP on port 8080, ALB terminates TLS
 resource "aws_lb_target_group" "argocd" {
   name        = "${var.project_name}-argocd-tg"
-  port        = 443
-  protocol    = "HTTPS"
+  port        = 8080
+  protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"  # Required for EKS with IP mode
 
@@ -142,7 +143,7 @@ resource "aws_lb_target_group" "argocd" {
     timeout             = 5
     interval            = 30
     path                = "/healthz"
-    protocol            = "HTTPS"
+    protocol            = "HTTP"
     matcher             = "200"
     port                = "traffic-port"
   }
@@ -155,6 +156,42 @@ resource "aws_lb_target_group" "argocd" {
       "elbv2.k8s.aws/cluster" = var.cluster_name
     }
   )
+}
+
+# Jenkins Target Group (EC2 instance)
+# Jenkins runs HTTP on port 8080
+resource "aws_lb_target_group" "jenkins" {
+  name        = "${var.project_name}-jenkins-tg"
+  port        = 8080
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "instance"  # EC2 instance
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 5
+    interval            = 30
+    path                = "/login"
+    protocol            = "HTTP"
+    matcher             = "200"
+    port                = "traffic-port"
+  }
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.project_name}-jenkins-tg"
+    }
+  )
+}
+
+# Register Jenkins EC2 instance to target group
+resource "aws_lb_target_group_attachment" "jenkins" {
+  target_group_arn = aws_lb_target_group.jenkins.arn
+  target_id        = var.jenkins_instance_id
+  port             = 8080
 }
 
 # HTTP Listener (redirects to HTTPS)
@@ -238,6 +275,30 @@ resource "aws_lb_listener_rule" "argocd" {
     var.common_tags,
     {
       Name = "${var.project_name}-argocd-rule"
+    }
+  )
+}
+
+# HTTPS Listener Rule for Jenkins
+resource "aws_lb_listener_rule" "jenkins" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 300
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.jenkins.arn
+  }
+
+  condition {
+    host_header {
+      values = ["jenkins.weatherlabs.org"]
+    }
+  }
+
+  tags = merge(
+    var.common_tags,
+    {
+      Name = "${var.project_name}-jenkins-rule"
     }
   )
 }

@@ -34,3 +34,8 @@ variable "certificate_arn" {
   description = "ARN of the ACM certificate for HTTPS listener"
   type        = string
 }
+
+variable "jenkins_instance_id" {
+  description = "Jenkins EC2 instance ID for target group attachment"
+  type        = string
+}

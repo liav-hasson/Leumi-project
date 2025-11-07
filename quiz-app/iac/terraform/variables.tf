@@ -212,6 +212,12 @@ variable "argocd_subdomain" {
   default     = ""
 }
 
+variable "jenkins_subdomain" {
+  description = "Full subdomain for Jenkins (e.g., jenkins.example.com)"
+  type        = string
+  default     = ""
+}
+
 # =============================================================================
 # Tags
 # =============================================================================

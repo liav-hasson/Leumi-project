@@ -126,3 +126,18 @@ resource "aws_route53_record" "argocd" {
     evaluate_target_health = true
   }
 }
+
+# Public DNS: jenkins.yourdomain.com → ALB (Jenkins EC2)
+resource "aws_route53_record" "jenkins" {
+  count = var.public_zone_enabled ? 1 : 0
+  
+  zone_id = data.aws_route53_zone.public[0].zone_id
+  name    = var.jenkins_subdomain
+  type    = "A"
+
+  alias {
+    name                   = var.alb_dns_name
+    zone_id                = var.alb_zone_id
+    evaluate_target_health = true
+  }
+}

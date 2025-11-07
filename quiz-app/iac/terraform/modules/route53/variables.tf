@@ -65,6 +65,12 @@ variable "argocd_subdomain" {
   default     = ""
 }
 
+variable "jenkins_subdomain" {
+  description = "Subdomain for Jenkins (e.g., jenkins.example.com)"
+  type        = string
+  default     = ""
+}
+
 # ALB (created by Terraform in prod_cluster/alb module)
 variable "alb_dns_name" {
   description = "DNS name of the ALB"

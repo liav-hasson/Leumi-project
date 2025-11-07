@@ -32,3 +32,8 @@ output "argocd_target_group_arn" {
   description = "ARN of the ArgoCD target group for TargetGroupBinding"
   value       = aws_lb_target_group.argocd.arn
 }
+
+output "jenkins_target_group_arn" {
+  description = "ARN of the Jenkins target group"
+  value       = aws_lb_target_group.jenkins.arn
+}

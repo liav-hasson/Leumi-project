@@ -9,7 +9,7 @@ metadata:
 spec:
   serviceRef:
     name: argocd-server
-    port: 443
+    port: 8080
   targetGroupARN: arn:aws:elasticloadbalancing:eu-north-1:610964304971:targetgroup/devops-quiz-eks-argocd-tg/e16442c78237852b
   targetType: ip
   networking:
@@ -19,4 +19,4 @@ spec:
               groupID: sg-0277e331e21718f10
         ports:
           - protocol: TCP
-            port: 443
+            port: 8080

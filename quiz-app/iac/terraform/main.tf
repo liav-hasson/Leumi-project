@@ -78,6 +78,7 @@ module "route53" {
   public_domain        = var.public_domain
   quiz_app_subdomain   = var.quiz_app_subdomain
   argocd_subdomain     = var.argocd_subdomain
+  jenkins_subdomain    = var.jenkins_subdomain
   alb_dns_name         = try(module.prod_cluster.alb_dns_name, "")
   alb_zone_id          = try(module.prod_cluster.alb_zone_id, "")
 }

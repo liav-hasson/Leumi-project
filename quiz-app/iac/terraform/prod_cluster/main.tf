@@ -48,7 +48,7 @@ module "security_groups" {
   depends_on = [module.eks_cluster, module.node_groups]
 }
 
-# Application Load Balancer (for EKS services only - ArgoCD, etc)
+# Application Load Balancer (for EKS services and Jenkins)
 module "alb" {
   source = "./alb"
 
@@ -57,8 +57,9 @@ module "alb" {
   vpc_id                     = var.vpc_id
   public_subnet_ids          = var.public_subnets
   certificate_arn            = var.certificate_arn
+  jenkins_instance_id        = module.jenkins.instance_id
   common_tags                = var.tags
   enable_deletion_protection = false
 
-  depends_on = [module.eks_cluster, module.node_groups]
+  depends_on = [module.eks_cluster, module.node_groups, module.jenkins]
 }
