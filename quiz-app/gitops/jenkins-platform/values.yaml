@@ -36,16 +36,14 @@ buildkit:
 
 # External Secrets Operator integration
 # Fetches Docker Hub credentials from AWS SSM Parameter Store
+# Uses cluster-level ClusterSecretStore (created by quiz-app ArgoCD application)
 externalSecrets:
   enabled: true
   namespace: jenkins
-  awsRegion: eu-north-1
   
-  # SecretStore configuration
+  # ClusterSecretStore configuration (cluster-scoped, not namespaced)
   secretStore:
-    name: aws-parameter-store
-    # Uses IRSA - External Secrets Operator service account already has IAM role
-    # Created by terraform: external_secrets_role_arn
+    name: aws-parameter-store  # References the ClusterSecretStore
   
   # Docker registry credentials from SSM
   # SSM Parameter: /weatherlabs/app/docker-registry-config
