@@ -16,7 +16,7 @@ GIT_USER_EMAIL="$6"
 # Validation
 if [ -z "$DOCKER_USERNAME" ] || [ -z "$IMAGE_TAG" ] || [ -z "$GITHUB_REPO_URL" ] || [ -z "$GIT_USER_NAME" ] || [ -z "$GIT_USER_EMAIL" ]; then
     echo "Usage: $0 <docker_username> <image_tag> <build_number> <github_repo_url> <git_user_name> <git_user_email>"
-    echo "❌ Missing required parameters:"
+    echo "ERROR: Missing required parameters:"
     echo "   DOCKER_USERNAME: '$DOCKER_USERNAME'"
     echo "   IMAGE_TAG: '$IMAGE_TAG'"  
     echo "   BUILD_NUMBER: '$BUILD_NUMBER'"
@@ -26,8 +26,8 @@ if [ -z "$DOCKER_USERNAME" ] || [ -z "$IMAGE_TAG" ] || [ -z "$GITHUB_REPO_URL" ]
     exit 1
 fi
 
-echo "🚀 Updating GitOps configuration..."
-echo "   Image: ${DOCKER_USERNAME}/quiz-app:${IMAGE_TAG}"
+echo "Updating GitOps configuration..."
+echo "Image: ${DOCKER_USERNAME}/quiz-app:${IMAGE_TAG}"
 
 # Create temp workspace
 TEMP_DIR=$(mktemp -d)
@@ -60,7 +60,7 @@ git diff values.yaml Chart.yaml
 # Commit and push
 echo "--------- Committing changes ---------"
 git add values.yaml Chart.yaml
-git commit -m "🚀 Deploy quiz-app:${IMAGE_TAG}
+git commit -m "Deploy quiz-app:${IMAGE_TAG}
 
 - Updated from Jenkins build #${BUILD_NUMBER:-unknown}
 - Image: ${DOCKER_USERNAME}/quiz-app:${IMAGE_TAG}
@@ -77,5 +77,5 @@ git push origin main
 # Cleanup
 rm -rf "$TEMP_DIR"
 
-echo "✅ GitOps update complete!"
-echo "   ArgoCD will detect the changes and sync automatically"
+echo "GitOps update complete!"
+echo "ArgoCD will detect the changes and sync automatically"

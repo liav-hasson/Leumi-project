@@ -45,6 +45,9 @@ the order of deployment is:
 
 ##  Architecture 
 
+### Argocd Applications view
+<img src="argocd.png">
+
 ### Why App-of-Apps Pattern?
 
 **Advantages:**

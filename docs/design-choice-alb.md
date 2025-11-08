@@ -79,5 +79,4 @@ letting the cloud load balancer controller to create the ALB after terraform fin
 
 - very similar to full gitops (b.).
 - main difference here is that terraform creates the base security groups.
-- allow for better security complience.
-- clear seperation.
+- allow for better security complience and clear seperation.
