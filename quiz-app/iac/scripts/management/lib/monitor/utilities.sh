@@ -79,7 +79,7 @@ colorize_line() {
 
 show_help() {
         echo -e ""
-        echo -e "${WHITE}🖥️  WeatherLabs Deployment Monitor${NC}"
+        echo -e "${WHITE}🖥️  Quiz-App Deployment Monitor${NC}"
         echo -e "${PURPLE}=================================${NC}"
         echo -e ""
         echo -e "${WHITE}Usage:${NC} monitor-deployment.sh [options]"

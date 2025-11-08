@@ -1,5 +1,12 @@
-from flask import Flask, render_template, request, session, redirect, url_for
+"""Quiz app Flask entrypoint.
+
+This module starts the Flask app for local development. In production the
+application should be run under a WSGI server (gunicorn/uwsgi) and not via
+``app.run()`` with ``debug=True`` or binding to all interfaces.
+"""
+
 import os
+from flask import Flask, render_template, request, session, redirect, url_for
 from quiz_utils import get_categories, get_subjects, get_random_keyword
 from ai_utils import generate_question, evaluate_answer
 
@@ -13,9 +20,11 @@ app.secret_key = os.environ.get('SECRET_KEY', 'devops-quiz-secret-key')
 
 # --- Helper function to reset session ---
 def reset_session(full=True):
-    """Clear session data. 
-    full=True → reset everything 
-    full=False → keep category, subject, difficulty"""
+    """Clear session data.
+
+    Args:
+        full: If True, reset everything. If False, keep category/subject/difficulty.
+    """
     if full:
         session.clear()
     else:
@@ -24,9 +33,10 @@ def reset_session(full=True):
         session.pop('answer', None)
         session.pop('keyword', None)
         session.pop('feedback', None)
-
-
 # --- Main index page (select category/subject/difficulty) ---
+@app.route('/', methods=["GET", "POST"])
+def index():
+    """Render the main page for category/subject/difficulty selection."""ndex page (select category/subject/difficulty) ---
 @app.route('/', methods=["GET", "POST"])
 def index():
     categories = get_categories()
@@ -52,10 +62,11 @@ def index():
             session['difficulty'] = request.form['difficulty'] or None
 
         if action == "generate":
-            if not session.get("difficulty"):
-                feedback = "Please select a difficulty before generating a question."
-            elif session.get('selected_category') and session.get('selected_subject'):
-                session['keyword'] = get_random_keyword(
+                keyword = get_random_keyword(
+                    session['selected_category'],
+                    session['selected_subject']
+                )
+                session['keyword'] = keywordession['keyword'] = get_random_keyword(
                     session['selected_category'],
                     session['selected_subject']
                 )
@@ -77,13 +88,14 @@ def index():
         difficulty=session.get('difficulty'),
         feedback=feedback
     )
-
-
 # --- Question page (answer & feedback) ---
 @app.route('/question', methods=["GET", "POST"])
 def question_page():
     # Check if we have a question, if not redirect to index
     if not session.get('question'):
+        return redirect(url_for('index'))
+
+    feedback = Noneget('question'):
         return redirect(url_for('index'))
     
     feedback = None
@@ -106,11 +118,11 @@ def question_page():
         elif action == "ask_again":
             reset_session(full=False)
             return redirect(url_for('index'))
-            
+
         elif action == "reset":
             reset_session(full=True)
             return redirect(url_for('index'))
-    
+
     # Get feedback from session if it exists (for both GET and POST requests)
     feedback = session.get('feedback', feedback)
 
@@ -122,5 +134,16 @@ def question_page():
         feedback=feedback
     )
 
+
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Don't run in debug mode or bind to 0.0.0.0 by default in production.
+    # Use environment variables to control runtime behavior for local testing.
+    try:
+        PORT = int(os.environ.get("FLASK_PORT", 5000))
+    except (TypeError, ValueError):
+        PORT = 5000
+
+    app.run(debug=debug, host=host, port=PORT)
+    app.run(debug=debug, host=host, port=PORT)
+
+    app.run(debug=debug, host=host, port=port)

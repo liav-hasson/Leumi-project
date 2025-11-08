@@ -46,15 +46,66 @@ get_prod_access_info() {
     [[ -n "$password" ]] && echo "ARGOCD_PASSWORD=$password"
 }
 
+get_jenkins_eks_credentials() {
+    # Get Jenkins EKS cluster credentials for Jenkins Kubernetes Cloud configuration
+    # Prints formatted output with all required values for Jenkins setup
+    # 
+    # These values change every time the cluster is destroyed and recreated.
+    # You must update Jenkins credentials and Kubernetes Cloud configuration after cluster recreate.
+    
+    echo_line
+    echo_line "================================="
+    echo_line "Jenkins EKS Cluster Credentials"
+    echo_line "================================="
+    echo_line
+    
+    # Check if kubectl is configured
+    if ! kubectl cluster-info &>/dev/null; then
+        echo_line "❌ Error: kubectl is not configured or cluster is not accessible"
+        echo_line "   Run: aws eks update-kubeconfig --name devops-quiz-eks --region eu-north-1"
+        return 1
+    fi
+    
+    # Check if jenkins-token secret exists
+    if ! kubectl get secret jenkins-token -n jenkins &>/dev/null; then
+        echo_line "❌ Error: jenkins-token secret not found in jenkins namespace"
+        echo_line "   Make sure ArgoCD has deployed the jenkins-platform application"
+        return 1
+    fi
+    
+    echo_line "1. Jenkins EKS Token (for jenkins-eks-token credential):"
+    echo_line "Insert in 'jenkins-eks-token' Secret text credential"
+    echo_line "================================================================="
+    local token=$(kubectl get secret jenkins-token -n jenkins -o jsonpath='{.data.token}' | base64 -d)
+    echo_line "$token"
+    echo_line "================================================================="
+    echo_line
+    
+    echo_line "2. Kubernetes API Server URL:"
+    echo_line "Insert in Kubernetes Cloud configuration 'Kubernetes URL' field"
+    echo_line "================================================================="
+    local api_url=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+    echo_line "$api_url"
+    echo_line "================================================================="
+    echo_line
+    
+    echo_line "3. Kubernetes Server Certificate Key (CA cert):"
+    echo_line "Insert in Kubernetes Cloud configuration 'Kubernetes server certificate key' field"
+    echo_line "================================================================="
+    local ca_cert=$(kubectl get secret jenkins-token -n jenkins -o jsonpath='{.data.ca\.crt}' | base64 -d)
+    echo_line "$ca_cert"
+    echo_line "================================================================="
+}
+
 # Flag: --access | -a
 # Display cluster access information
 show_cluster_access() {
     log_message "Fetching cluster access information..."
     
     echo_line
-    echo_line "╔════════════════════════════════════════════════════════════╗"
-    echo_line "║            Quiz App DevOps - Cluster Access                ║"
-    echo_line "╚════════════════════════════════════════════════════════════╝"
+    echo_line "================================="
+    echo_line "Quiz App DevOps - Cluster Access"
+    echo_line "================================="
     echo_line
     echo_line "EKS Cluster Access:"
     echo_line "  Context:     kubectl config use-context $EKS_CLUSTER_NAME"
@@ -63,6 +114,7 @@ show_cluster_access() {
     echo_line "Application URLs (after ArgoCD deployment):"
     echo_line "  Quiz App:    https://$QUIZ_APP_HOST"
     echo_line "  ArgoCD UI:   https://$ARGOCD_HOST"
+    echo_line "  Jenkins UI:  https://jenkins.weatherlabs.org"
     echo_line
     echo_line "Jenkins (Internal VPC Access via SSM):"
     echo_line "  Internal DNS: $JENKINS_INTERNAL_HOST"
@@ -94,18 +146,20 @@ open_web_uis() {
     log_message "Getting web UI URLs..."
     
     echo_line
-    echo_line "╔════════════════════════════════════════════════════════════╗"
-    echo_line "║                    Web UI Access                           ║"
-    echo_line "╚════════════════════════════════════════════════════════════╝"
+    echo_line "================================="
+    echo_line "Web UI Access"
+    echo_line "================================="
     echo_line
-    echo_line "Quiz App and ArgoCD are accessible via ALB with HTTPS."
+    echo_line "Quiz App, ArgoCD, and Jenkins are accessible via ALB with HTTPS."
     echo_line
 
     local quiz_url="https://$QUIZ_APP_HOST"
     local argocd_url="https://$ARGOCD_HOST"
+    local jenkins_url="https://jenkins.weatherlabs.org"
     
     echo_line "Quiz App: $quiz_url"
     echo_line "ArgoCD UI: $argocd_url"
+    echo_line "Jenkins UI: $jenkins_url"
     echo_line
     
     # Get ArgoCD password
@@ -124,6 +178,7 @@ open_web_uis() {
     if command -v xdg-open &>/dev/null; then
         xdg-open "$quiz_url" 2>/dev/null &
         xdg-open "$argocd_url" 2>/dev/null &
+        xdg-open "$jenkins_url" 2>/dev/null &
     elif command -v open &>/dev/null; then
         open "$quiz_url" 2>/dev/null &
         open "$argocd_url" 2>/dev/null &
@@ -169,9 +224,9 @@ manage_argocd() {
     log_message "Managing ArgoCD installation..."
 
     echo_line
-    echo_line "╔════════════════════════════════════════════════════════════╗"
-    echo_line "║                  ArgoCD Status                             ║"
-    echo_line "╚════════════════════════════════════════════════════════════╝"
+    echo_line "================================="
+    echo_line "ArgoCD Status"
+    echo_line "================================="
     echo_line
 
     # Check if ArgoCD is already installed
@@ -209,15 +264,16 @@ manage_argocd() {
 # Show help
 show_help() {
     echo_line
-    echo_line "╔════════════════════════════════════════════════════════════╗"
-    echo_line "║        Quiz App DevOps - Project Utilities                ║"
-    echo_line "╚════════════════════════════════════════════════════════════╝"
+    echo_line "================================="
+    echo_line "Quiz App DevOps - Project Utilities"
+    echo_line "================================="
     echo_line
     echo_line "Usage: project-utils [OPTIONS]"
     echo_line
     echo_line "Options:"
     echo_line "  --access,   -a       Show access information (cluster + apps)"
     echo_line "  --argocd,   -r       Show ArgoCD status"
+    echo_line "  --jenkins,  -j       Get Jenkins EKS credentials for Kubernetes Cloud"
     echo_line "  --open,     -o       Open web UIs in browser"
     echo_line "  --help,     -h       Show this help"
     echo_line
@@ -231,6 +287,9 @@ main() {
             ;;
         "--argocd"|"-r")
             manage_argocd
+            ;;
+        "--jenkins"|"-j")
+            get_jenkins_eks_credentials
             ;;
         "--open"|"-o")
             open_web_uis
