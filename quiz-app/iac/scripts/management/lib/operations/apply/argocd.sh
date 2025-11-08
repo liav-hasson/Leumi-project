@@ -35,6 +35,7 @@ apply_bootstrap_argocd() {
         
         if ! run_logged "$HELM_LOG_FILE" helm upgrade argocd argo/argo-cd \
             --namespace argocd \
+            --set server.extraArgs[0]="--insecure" \
             --wait --timeout 10m; then
             log_error "ArgoCD upgrade failed"
             handle_failure "$operation" 1 "argocd_upgrade"
@@ -45,6 +46,7 @@ apply_bootstrap_argocd() {
         if ! run_logged "$HELM_LOG_FILE" helm install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
+            --set server.extraArgs[0]="--insecure" \
             --wait --timeout 10m; then
             log_error "ArgoCD installation failed"
             handle_failure "$operation" 1 "argocd_install"

@@ -36,13 +36,6 @@
    - Get with: `kubectl get secret jenkins-token -n jenkins -o jsonpath='{.data.token}' | base64 -d`
    - Purpose: Jenkins authenticate with EKS
 
-### KEEP - Existing Credentials:
-- `dockerhub-credentials` ✅
-- `cosign-password` ✅
-- `cosign-private-key` ✅
-- `cosign-public-key` ✅
-
----
 
 ## Other Required Setup
 
@@ -51,10 +44,10 @@
 - Scopes needed: `repo`, `admin:repo_hook`
 - Use this token for both `github-credentials` and `github-token`
 
-### 2. GitHub Webhook
-- URL: `https://jenkins.weatherlabs.org/github-webhook/`
-- Content type: `application/json`
-- Events: Push events, Pull requests
+### put the webhook secret in jenkins credentials:
+Add credential: Secret text
+ID: github-webhook-secret
+Secret: 1f185aa8e445b225b526d78f23749ced9cdf6539221f828bba1dd427e4da19d4
 
 
 ### 4. Jenkins GitHub Plugin
@@ -66,3 +59,10 @@
 - Add EKS cluster with `jenkins-eks-token` credential
 - API Server: Get from `kubectl config view --minify`
 
+
+# done:
+
+### 2. GitHub Webhook
+- URL: `https://jenkins.weatherlabs.org/github-webhook/`
+- Content type: `application/json`
+- Events: Push events, Pull requests

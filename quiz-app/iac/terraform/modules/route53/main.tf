@@ -57,6 +57,10 @@ resource "aws_acm_certificate" "main" {
   count = var.public_zone_enabled ? 1 : 0
   
   domain_name       = var.quiz_app_subdomain
+  subject_alternative_names = [
+    var.argocd_subdomain,
+    var.jenkins_subdomain
+  ]
   validation_method = "DNS"
 
   tags = merge(
@@ -97,7 +101,3 @@ resource "aws_acm_certificate_validation" "main" {
   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
 }
 
-# ALB DNS records moved to main.tf to break circular dependency
-# This module now only handles:
-# - Private hosted zone records (Jenkins internal DNS)
-# - ACM certificate creation (independent of ALB)

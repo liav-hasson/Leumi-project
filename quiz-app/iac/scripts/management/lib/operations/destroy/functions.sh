@@ -55,21 +55,35 @@ destroy_cleanup_eks_cluster() {
         --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null)
     
     if [[ -n "$cluster_sg" && "$cluster_sg" != "None" ]]; then
+        log_info "Found cluster security group: $cluster_sg"
         local alb_sgs=$(aws ec2 describe-security-groups --region "$AWS_REGION" \
             --filters "Name=tag:Name,Values=*alb-sg*" \
             --query 'SecurityGroups[*].GroupId' --output text 2>/dev/null)
         
         for alb_sg in $alb_sgs; do
-            log_info "Removing security group rules referencing $alb_sg"
-            aws ec2 describe-security-groups --region "$AWS_REGION" --group-ids "$cluster_sg" \
+            log_info "Checking for rules referencing ALB SG: $alb_sg"
+            local rules=$(aws ec2 describe-security-groups --region "$AWS_REGION" --group-ids "$cluster_sg" \
                 --query "SecurityGroups[0].IpPermissions[?contains(to_string(UserIdGroupPairs), '$alb_sg')]" \
-                --output json 2>/dev/null | jq -c '.[]' 2>/dev/null | while read -r rule; do
+                --output json 2>/dev/null)
+            
+            if [[ "$rules" != "[]" && -n "$rules" ]]; then
+                log_info "Found rules to remove, revoking ingress..."
+                echo "$rules" | jq -c '.[]' 2>/dev/null | while read -r rule; do
                     if [[ -n "$rule" ]]; then
+                        log_info "Revoking rule: $rule"
                         aws ec2 revoke-security-group-ingress --region "$AWS_REGION" --group-id "$cluster_sg" \
-                            --ip-permissions "$rule" 2>&1 | tee -a "$HELM_LOG_FILE" || true
+                            --ip-permissions "$rule" 2>&1 | tee -a "$HELM_LOG_FILE" || {
+                            log_warning "Failed to revoke rule, continuing..."
+                        }
                     fi
                 done
+                log_info "Security group rules cleanup complete"
+            else
+                log_info "No rules found referencing $alb_sg"
+            fi
         done
+    else
+        log_warning "Cluster security group not found, skipping SG cleanup"
     fi
     
     # Step 2: Delete ArgoCD applications FIRST to stop them from recreating resources

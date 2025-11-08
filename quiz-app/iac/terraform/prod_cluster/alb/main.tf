@@ -144,7 +144,7 @@ resource "aws_lb_target_group" "argocd" {
     interval            = 30
     path                = "/healthz"
     protocol            = "HTTP"
-    matcher             = "200"
+    matcher             = "200-399"  # Accept redirects (ArgoCD returns 307)
     port                = "traffic-port"
   }
 
