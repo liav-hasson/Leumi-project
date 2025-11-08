@@ -97,7 +97,7 @@ Developer Push → GitHub Webhook → Jenkins Pipeline → Docker Build (BuildKi
 - **Check out these documents, explaining the architecture of ArgoCD I used, and the choices i took**:
 
   **[GitOps structure](quiz-app/gitops/README.md)** |
-  **[Terraform vs Kuberenets API](docs/design-choice-alb.txt)** 
+  **[Terraform vs Kuberenets API](docs/design-choice-alb.md)** 
 
 #### Access Applications
 
