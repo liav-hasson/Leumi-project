@@ -69,9 +69,9 @@ Developer Push → GitHub Webhook → Jenkins Pipeline → Docker Build (BuildKi
 
 #### Configure values
 
-- Edit: **quiz-app/iac/terraform/terraform.tfvars** for resource provisioning
-- Edit: **quiz-app/iac/scripts/lib/helpers/config-loader.sh** values for scripts default configuration 
-- Edit: **quiz-app/gitops/** values for resource configuration
+- Edit: **[terraform.tfvars](quiz-app/iac/terraform/terraform.tfvars)** for resource provisioning
+- Edit: **[config-loader.sh](quiz-app/iac/scripts/management/lib/helpers/config-loader.sh)** for scripts default values 
+- Edit: **[argocd](quiz-app/gitops/)** values for application configuration
 
 #### Prerequisites
 

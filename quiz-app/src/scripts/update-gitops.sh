@@ -74,6 +74,17 @@ git commit -m "Deploy quiz-app:${IMAGE_TAG}
 echo "Pushing changes to GitHub..."
 git push origin main
 
+# Tag the release version for next build's version calculation
+echo "--------- Tagging release version ---------"
+cd "$TEMP_DIR"
+git tag -a "${IMAGE_TAG}" -m "Release ${IMAGE_TAG} - Build #${BUILD_NUMBER:-unknown}" 2>/dev/null || {
+    echo "Tag ${IMAGE_TAG} already exists, skipping tag creation"
+}
+git push origin "${IMAGE_TAG}" 2>/dev/null || {
+    echo "Tag ${IMAGE_TAG} already exists on remote, skipping tag push"
+}
+echo "Tagged release: ${IMAGE_TAG}"
+
 # Cleanup
 rm -rf "$TEMP_DIR"
 

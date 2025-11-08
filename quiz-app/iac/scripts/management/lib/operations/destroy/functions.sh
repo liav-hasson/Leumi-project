@@ -104,11 +104,22 @@ destroy_cleanup_eks_cluster() {
     
     # Step 3: Now remove finalizers from resources (ArgoCD won't recreate them anymore)
     log_info "Removing finalizers from TargetGroupBindings..."
-    kubectl get targetgroupbindings -A -o json 2>/dev/null | \
-        jq -r '.items[] | "\(.metadata.namespace) \(.metadata.name)"' | \
-        while read -r ns name; do
-            kubectl patch targetgroupbinding "$name" -n "$ns" -p '{"metadata":{"finalizers":[]}}' --type=merge 2>&1 | tee -a "$HELM_LOG_FILE" || true
-        done
+    if kubectl get targetgroupbindings -A &>/dev/null; then
+        kubectl get targetgroupbindings -A -o json 2>/dev/null | \
+            jq -r '.items[] | "\(.metadata.namespace) \(.metadata.name)"' 2>/dev/null | \
+            while read -r ns name; do
+                if [[ -n "$ns" && -n "$name" ]]; then
+                    log_info "Patching TGB: $ns/$name"
+                    kubectl patch targetgroupbinding "$name" -n "$ns" -p '{"metadata":{"finalizers":[]}}' --type=merge 2>&1 | tee -a "$HELM_LOG_FILE" || true
+                fi
+            done
+        
+        # Force delete any remaining TGBs
+        log_info "Force deleting all TargetGroupBindings..."
+        kubectl delete targetgroupbindings --all -A --grace-period=0 --force --timeout=30s 2>&1 | tee -a "$HELM_LOG_FILE" || true
+    else
+        log_info "No TargetGroupBindings found or CRD not installed"
+    fi
     
     log_info "Removing finalizers from ExternalSecrets..."
     kubectl get externalsecrets -A -o json 2>/dev/null | \
