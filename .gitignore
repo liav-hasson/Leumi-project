@@ -107,7 +107,6 @@ __marimo__/
 terraform.tfstate
 terraform.tfstate.backup
 .terraform.tfstate.lock.info
-*.tfvars
 !*.tfvars.example
 *.tfplan
 *.tfplan.*

@@ -1,19 +1,16 @@
 variable "aws_region" {
   description = "AWS region"
   type        = string
-  # No default: value provided by central config through root module
 }
 
 variable "cluster_name" {
   description = "EKS cluster name"
   type        = string
-  # No default: value provided by central config through root module
 }
 
 variable "kubernetes_version" {
   description = "Kubernetes version (MAJOR.MINOR). Provided by root module."
   type        = string
-  # no default: required parameter to avoid module-level stale defaults
 }
 
 
@@ -36,15 +33,12 @@ variable "node_groups" {
     instance_types = list(string)
     capacity_type  = string
   }))
-  # No default: values provided by central config through root module
 }
 
-# Removed kubespray_iam_role_arn - no longer needed with ArgoCD
 
 variable "tags" {
   description = "Additional tags for all resources"
   type        = map(string)
-  # No default: values provided by central config through root module
 }
 
 variable "jenkins_security_group_id" {
@@ -67,7 +61,3 @@ variable "certificate_arn" {
   description = "ARN of the ACM certificate for HTTPS listener"
   type        = string
 }
-
-// Removed app_namespace and create_kubernetes_resources: Kubernetes resources handled by Helm now.
-
-# Removed kubernetes_security_group_id - no longer needed for kubespray EKS access
