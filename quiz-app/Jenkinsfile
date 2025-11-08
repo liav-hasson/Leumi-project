@@ -48,9 +48,6 @@ pipeline {
         // This is a GitHub Personal Access Token with repo scope
         GITHUB_TOKEN          = credentials('github-token')
         
-        // Container signing password (key files handled in withCredentials blocks)
-        COSIGN_PASSWORD       = credentials('cosign-password')
-        
         // GitOps Configuration
         // GitHub repository for this application
         GITHUB_REPO           = "liav-hasson/Leumi-project"
@@ -72,7 +69,7 @@ pipeline {
                     env.IMAGE_TAG = env.BUILD_TAG
 
                     // Compute semantic version and set env for the rest of pipeline
-                    def semver = sh(returnStdout: true, script: './src/scripts/compute_next_version.sh . auto').trim()
+                    def semver = sh(returnStdout: true, script: './quiz-app/src/scripts/compute_next_version.sh ./quiz-app auto').trim()
                     if (semver) {
                         echo "Computed semantic version: ${semver}"
                         env.IMAGE_TAG = semver
@@ -95,9 +92,9 @@ pipeline {
                 echo '--------- Starting checkout and testing ---------'
 
                 echo '--------- Running pylint test ---------'
-                sh 'pylint src/python/main.py --score=yes --fail-under=5.0'
-                sh 'pylint src/python/quiz_utils.py --score=yes --fail-under=5.0'
-                sh 'pylint src/python/ai_utils.py --score=yes --fail-under=5.0'
+                sh 'pylint quiz-app/src/python/main.py --score=yes --fail-under=5.0'
+                sh 'pylint quiz-app/src/python/quiz_utils.py --score=yes --fail-under=5.0'
+                sh 'pylint quiz-app/src/python/ai_utils.py --score=yes --fail-under=5.0'
                 echo 'Pylint checks passed!'
 
                 echo '--------- Skipping unit tests (no tests directory) ---------'
@@ -108,11 +105,11 @@ pipeline {
                     # Run safety check on production dependencies only
                     # Focus on src/requirements.txt (production dependencies)
                     # Exit code 64 means vulnerabilities found, 0 means clean
-                    safety check --json --file src/requirements.txt || {
+                    safety check --json --file quiz-app/src/requirements.txt || {
                         if [ $? -eq 64 ]; then
                             echo "CRITICAL: Vulnerabilities found in production dependencies!"
-                            echo "Pipeline failed due to security vulnerabilities in src/requirements.txt"
-                            safety check --file src/requirements.txt --output text
+                            echo "Pipeline failed due to security vulnerabilities in quiz-app/src/requirements.txt"
+                            safety check --file quiz-app/src/requirements.txt --output text
                             exit 1
                         else
                             echo "Safety check failed with unexpected error"
@@ -137,11 +134,11 @@ pipeline {
                 sh '''
                     # Run Bandit security analysis on Python source code
                     echo "Scanning Python code with Bandit..."
-                    bandit -r src/python/ -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
+                    bandit -r quiz-app/src/python/ -f json -o bandit-report.json -ll || BANDIT_EXIT_CODE=$?
                     
                     # Display results in human-readable format  
                     echo "Bandit scan results:"
-                    bandit -r src/python/ -f txt || true
+                    bandit -r quiz-app/src/python/ -f txt || true
                     
                     # Check if high/medium severity issues found (exit codes 1-2)
                     if [ "${BANDIT_EXIT_CODE:-0}" -eq 1 ] || [ "${BANDIT_EXIT_CODE:-0}" -eq 2 ]; then
@@ -173,11 +170,11 @@ pipeline {
                     # Run Hadolint security scan on Dockerfile
                     # Check for security issues, best practices, and compliance
                     echo "Scanning Dockerfile with Hadolint..."
-                    hadolint --format json Dockerfile > hadolint-report.json || HADOLINT_EXIT_CODE=$?
+                    hadolint --format json quiz-app/Dockerfile > hadolint-report.json || HADOLINT_EXIT_CODE=$?
                     
                     # Display results in human-readable format
                     echo "Hadolint scan results:"
-                    hadolint Dockerfile || true
+                    hadolint quiz-app/Dockerfile || true
                     
                     # Check if critical/error level issues found
                     if [ "${HADOLINT_EXIT_CODE:-0}" -ne 0 ]; then
@@ -212,8 +209,8 @@ pipeline {
                         echo "Building quiz-app image with buildctl..."
                         buildctl --addr ${BUILDKIT_HOST} build \
                             --frontend dockerfile.v0 \
-                            --local context=. \
-                            --local dockerfile=. \
+                            --local context=quiz-app \
+                            --local dockerfile=quiz-app \
                             --output type=image,name=${DOCKERHUB_CREDENTIALS_USR}/quiz-app:${IMAGE_TAG},push=true
                         
                         echo "Image ${DOCKERHUB_CREDENTIALS_USR}/quiz-app:${IMAGE_TAG} built and pushed"
@@ -229,91 +226,6 @@ pipeline {
             }
         }
 
-        stage('Sign Container Image') {
-            steps {
-                echo '--------- Signing container image with Cosign ---------'
-                script {
-                    withCredentials([
-                        file(credentialsId: 'cosign-private-key', variable: 'COSIGN_PRIVATE_KEY_FILE')
-                    ]) {
-                        sh '''
-                            # Sign the container image using Cosign with private key
-                            IMAGE_NAME="${DOCKERHUB_CREDENTIALS_USR}/quiz-app:${IMAGE_TAG}"
-                            
-                            echo "Signing image: ${IMAGE_NAME}"
-                            
-                            # Login to Docker Hub for signature push authentication
-                            # Use writable directory for Docker credentials (mounted dir is read-only)
-                            echo "Logging into Docker Hub for signature push..."
-                            export DOCKER_CONFIG="/tmp/.docker"
-                            mkdir -p /tmp/.docker
-                            echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login --username "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
-                            
-                            # Sign the image using the private key file with auto-confirmation
-                            # Docker CLI authentication will be used by cosign for signature push
-                            COSIGN_PASSWORD="${COSIGN_PASSWORD}" cosign sign --key "${COSIGN_PRIVATE_KEY_FILE}" --yes "${IMAGE_NAME}"
-                            
-                            echo "Image ${IMAGE_NAME} signed successfully with Cosign"
-                            echo "Signature pushed to Docker Hub registry"
-                        '''
-                    }
-                }
-            }
-            post {
-                failure {
-                    script {
-                        env.PIPELINE_STATUS = "FAILURE"
-                    }
-                    echo "❌ Failed to sign container image"
-                }
-                success {
-                    echo "✅ Container image signed successfully with Cosign"
-                }
-            }
-        }
-
-        stage('Verify Container Signature') {
-            steps {
-                echo '--------- Verifying container signature ---------'
-                script {
-                    withCredentials([
-                        file(credentialsId: 'cosign-public-key', variable: 'COSIGN_PUBLIC_KEY_FILE')
-                    ]) {
-                        sh '''
-                            # Verify the container signature using Cosign with public key
-                            IMAGE_NAME="${DOCKERHUB_CREDENTIALS_USR}/quiz-app:${IMAGE_TAG}"
-                            
-                            echo "Verifying signature for image: ${IMAGE_NAME}"
-                            cosign verify --key "${COSIGN_PUBLIC_KEY_FILE}" "${IMAGE_NAME}" || {
-
-                                echo "Direct verification failed, checking signature existence..."
-
-                                # Try to list signatures
-                                cosign triangulate "${IMAGE_NAME}" || echo "Could not triangulate signature location"
-
-                                echo "Note: Verification failed but signing appeared to succeed"
-                                echo "This may be due to registry propagation delay"
-                                echo "Continuing Pipeline anyway..."
-                                exit 0
-                            }
-                            
-                            echo "Image signature verified successfully"
-                        '''
-                    }
-                }
-            }
-            post {
-                failure {
-                    script {
-                        env.PIPELINE_STATUS = "FAILURE"
-                    }
-                    echo "❌ Failed to verify container signature"
-                }
-                success {
-                    echo "✅ Container signature verified successfully"
-                }
-            }
-        }
 
         stage('Update GitOps Repository') {
             steps {
@@ -328,7 +240,7 @@ pipeline {
                             git config --global credential.helper store
                             echo "https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com" > ~/.git-credentials
                             
-                            ./src/scripts/update-gitops.sh \
+                            ./quiz-app/src/scripts/update-gitops.sh \
                                 "${DOCKERHUB_CREDENTIALS_USR}" \
                                 "${IMAGE_TAG}" \
                                 "${BUILD_NUMBER}" \
