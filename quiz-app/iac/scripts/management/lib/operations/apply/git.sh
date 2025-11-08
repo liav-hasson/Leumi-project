@@ -36,6 +36,14 @@ apply_commit_injection_changes() {
     local commit_msg="auto commit: injecting Terraform outputs into GitOps manifests"
     git commit -m "$commit_msg"
     
+    # Pull latest changes (Jenkins may have pushed image tag updates)
+    log_info "Pulling latest changes from remote..."
+    if ! git pull --rebase origin main; then
+        log_error "Failed to rebase on remote changes"
+        log_warning "Resolve conflicts manually: cd $repo && git rebase --continue"
+        return 1
+    fi
+    
     # Push automatically
     log_info "Pushing GitOps changes to remote..."
     if git push; then

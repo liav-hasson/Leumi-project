@@ -1,6 +1,9 @@
 # Core Project Scripts  
 
 Management utilities for Quiz App infrastructure deployment and operations. These scripts streamline the workflow for provisioning, monitoring, and accessing AWS resources.
+
+- The scripts are structured to be moveable, so they can run on any machine that pulls the source code. 
+* they are dependent on the project architecture and relative paths.
   
 ## How To Use
 
