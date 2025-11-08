@@ -42,8 +42,7 @@ ingress:
 
 targetGroupBinding:
   enabled: true
-  # value injected from terraform output
-  targetGroupARN: ""
+  targetGroupARN: "" # Injected by Terraform
   targetType: ip
   serviceRef:
     name: "quiz-app"
@@ -52,8 +51,7 @@ targetGroupBinding:
     ingress:
       - from:
           - securityGroup:
-              # value injected from terraform output
-              groupID: ""
+              groupID: "" # Injected by Terraform
         ports:
           - protocol: TCP
             port: 5000

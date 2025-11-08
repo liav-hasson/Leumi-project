@@ -77,21 +77,21 @@ inject_terraform_values() {
     # Update quiz-app values
     if [[ -n "$TG_ARN" ]]; then
         log_info "Updating Quiz App TargetGroupBinding ARN..."
-        sed -i "s|PLACEHOLDER_TARGET_GROUP_ARN|$TG_ARN|g" \
+        sed -i "s|targetGroupARN: \"\" # Injected by Terraform|targetGroupARN: \"$TG_ARN\"|g" \
           quiz-app/values.yaml
     fi
     
     # Update ArgoCD TargetGroupBinding
     if [[ -n "$ARGOCD_TG_ARN" ]]; then
         log_info "Updating ArgoCD TargetGroupBinding ARN..."
-        sed -i "s|PLACEHOLDER_ARGOCD_TARGET_GROUP_ARN|$ARGOCD_TG_ARN|g" \
+        sed -i "s|targetGroupARN: \"\" # Injected by Terraform|targetGroupARN: \"$ARGOCD_TG_ARN\"|g" \
           argocd/argocd-targetgroupbinding.yaml
     fi
     
     # Update security group IDs in both files
     if [[ -n "$ALB_SG_ID" ]]; then
         log_info "Updating ALB Security Group IDs..."
-        sed -i "s|PLACEHOLDER_ALB_SECURITY_GROUP_ID|$ALB_SG_ID|g" \
+        sed -i "s|groupID: \"\" # Injected by Terraform|groupID: \"$ALB_SG_ID\"|g" \
           quiz-app/values.yaml \
           argocd/argocd-targetgroupbinding.yaml
     fi
