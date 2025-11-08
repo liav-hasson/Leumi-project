@@ -66,12 +66,12 @@ inject_terraform_values() {
     
     # Update ALB Controller IRSA (replace the value line after role-arn)
     log_info "Updating AWS Load Balancer Controller IRSA..."
-    sed -i "/serviceAccount.annotations.eks\.amazonaws\.com\/role-arn/,/value:/ s|value: .*|value: $ALB_ROLE|" \
+    sed -i "s|value: \".*\" # Injected by Terraform|value: \"$ALB_ROLE\" # Injected by Terraform|g" \
       applications/aws-load-balancer-controller.yaml
     
     # Update External Secrets IRSA (replace the value line after role-arn)
     log_info "Updating External Secrets Operator IRSA..."
-    sed -i "/serviceAccount.annotations.eks\.amazonaws\.com\/role-arn/,/value:/ s|value: .*|value: $ESO_ROLE|" \
+    sed -i "s|value: \".*\" # Injected by Terraform|value: \"$ESO_ROLE\" # Injected by Terraform|g" \
       applications/external-secrets.yaml
     
     # Update quiz-app values (replace any existing value)
