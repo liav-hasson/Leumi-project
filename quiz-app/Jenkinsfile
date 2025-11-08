@@ -1,6 +1,7 @@
 pipeline {
     agent {
         kubernetes {
+            cloud 'quiz-app-eks'
             yaml '''
                 apiVersion: v1
                 kind: Pod
