@@ -64,34 +64,34 @@ inject_terraform_values() {
     # Change to GitOps directory
     cd "$GITOPS_ROOT"
     
-    # Update ALB Controller IRSA
+    # Update ALB Controller IRSA (replace the value line after role-arn)
     log_info "Updating AWS Load Balancer Controller IRSA..."
-    sed -i "s|REPLACE_WITH_TERRAFORM_OUTPUT_alb_controller_role_arn|$ALB_ROLE|g" \
+    sed -i "/serviceAccount.annotations.eks\.amazonaws\.com\/role-arn/,/value:/ s|value: .*|value: $ALB_ROLE|" \
       applications/aws-load-balancer-controller.yaml
     
-    # Update External Secrets IRSA
+    # Update External Secrets IRSA (replace the value line after role-arn)
     log_info "Updating External Secrets Operator IRSA..."
-    sed -i "s|REPLACE_WITH_TERRAFORM_OUTPUT_external_secrets_role_arn|$ESO_ROLE|g" \
+    sed -i "/serviceAccount.annotations.eks\.amazonaws\.com\/role-arn/,/value:/ s|value: .*|value: $ESO_ROLE|" \
       applications/external-secrets.yaml
     
-    # Update quiz-app values
+    # Update quiz-app values (replace any existing value)
     if [[ -n "$TG_ARN" ]]; then
         log_info "Updating Quiz App TargetGroupBinding ARN..."
-        sed -i "s|targetGroupARN: \"\" # Injected by Terraform|targetGroupARN: \"$TG_ARN\"|g" \
+        sed -i "s|targetGroupARN: \".*\" # Injected by Terraform|targetGroupARN: \"$TG_ARN\" # Injected by Terraform|g" \
           quiz-app/values.yaml
     fi
     
-    # Update ArgoCD TargetGroupBinding
+    # Update ArgoCD TargetGroupBinding (replace any existing value)
     if [[ -n "$ARGOCD_TG_ARN" ]]; then
         log_info "Updating ArgoCD TargetGroupBinding ARN..."
-        sed -i "s|targetGroupARN: \"\" # Injected by Terraform|targetGroupARN: \"$ARGOCD_TG_ARN\"|g" \
+        sed -i "s|targetGroupARN: \".*\" # Injected by Terraform|targetGroupARN: \"$ARGOCD_TG_ARN\" # Injected by Terraform|g" \
           argocd/argocd-targetgroupbinding.yaml
     fi
     
-    # Update security group IDs in both files
+    # Update security group IDs in both files (replace any existing value)
     if [[ -n "$ALB_SG_ID" ]]; then
         log_info "Updating ALB Security Group IDs..."
-        sed -i "s|groupID: \"\" # Injected by Terraform|groupID: \"$ALB_SG_ID\"|g" \
+        sed -i "s|groupID: \".*\" # Injected by Terraform|groupID: \"$ALB_SG_ID\" # Injected by Terraform|g" \
           quiz-app/values.yaml \
           argocd/argocd-targetgroupbinding.yaml
     fi

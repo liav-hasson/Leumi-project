@@ -161,3 +161,6 @@ terraform.rc
 # Temporary files
 tmp/
 temp/
+
+# secrets
+jenkins-github-migration-summary.md
