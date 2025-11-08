@@ -28,6 +28,7 @@ module "iam" {
   eks_cluster_arn      = module.prod_cluster.cluster_arn
   oidc_provider_arn    = module.prod_cluster.oidc_provider_arn
   ssm_parameter_prefix = var.ssm_parameter_prefix
+  
   # SA namespaces
   alb_service_account_name      = var.alb_service_account_name
   alb_service_account_namespace = var.alb_service_account_namespace
@@ -61,7 +62,6 @@ module "jenkins" {
 }
 
 # Route53 DNS & ACM Certificate
-# Note: Public DNS records for ALB services are created AFTER prod_cluster
 module "route53" {
   source = "./modules/route53"
 
@@ -80,7 +80,6 @@ module "route53" {
   quiz_app_subdomain   = var.quiz_app_subdomain
   argocd_subdomain     = var.argocd_subdomain
   jenkins_subdomain    = var.jenkins_subdomain
-  # Note: ALB DNS records now created separately in main.tf after prod_cluster
 }
 
 # Production EKS Cluster  

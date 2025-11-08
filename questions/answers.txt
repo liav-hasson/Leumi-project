@@ -1,0 +1,355 @@
+Answering debugging questions based on the diagram (reference.png)
+
+1. a. The TEST EC2 machine is unable to resolve DNS of Internet addresses
+
+Failure points to test in order:
+
+1. **VPC DNS Settings** (Most Common)
+   - Check if DNS resolution is enabled on the VPC
+   - Verify: `aws ec2 describe-vpcs --vpc-ids <vpc-id> --query 'Vpcs[0].[EnableDnsSupport,EnableDnsHostnames]'`
+   - Both should be `true` for DNS to work
+   - In our Terraform: `vpc/main.tf` sets `enable_dns_hostnames = true` and `enable_dns_support = true`
+
+2. **Security Group Outbound Rules**
+   - Verify security group allows outbound DNS traffic (UDP/TCP port 53)
+   - Check: `aws ec2 describe-security-groups --group-ids <sg-id>`
+   - Our SG in `security-groups/main.tf` allows all outbound: `protocol = "-1"` and `cidr_blocks = ["0.0.0.0/0"]`
+
+3. **Route Table Configuration**
+   - EC2 in public subnet needs route to IGW: `0.0.0.0/0 → igw-xxxxx`
+   - EC2 in private subnet needs route to NAT Gateway: `0.0.0.0/0 → nat-xxxxx`
+   - Check: `aws ec2 describe-route-tables --filters "Name=vpc-id,Values=<vpc-id>"`
+   - Our Terraform: Public RT points to IGW, Private RT points to NAT GW
+
+4. **Network ACLs (NACLs)**
+   - Default NACLs allow all traffic, custom NACLs might block DNS
+   - Check both inbound/outbound rules for UDP/TCP 53
+   - Verify: `aws ec2 describe-network-acls --filters "Name=vpc-id,Values=<vpc-id>"`
+
+5. **Instance-Level DNS Configuration**
+   - SSH to EC2 and check `/etc/resolv.conf`
+   - Should show: `nameserver 10.181.242.2` (VPC DNS resolver is VPC CIDR + 2)
+   - Test DNS manually: `nslookup google.com` or `dig google.com`
+
+6. **NAT Gateway Health** (If EC2 is in private subnet)
+   - Verify NAT Gateway status is "available"
+   - Check: `aws ec2 describe-nat-gateways --filter "Name=vpc-id,Values=<vpc-id>"`
+   - Ensure NAT GW has an Elastic IP attached
+
+7. **Internet Gateway Attachment**
+   - Verify IGW is attached to the VPC
+   - Check: `aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=<vpc-id>"`
+
+**Testing Flow:**
+```bash
+# 1. Check VPC DNS settings
+aws ec2 describe-vpcs --vpc-ids vpc-xxxxx
+
+# 2. Test from EC2 instance
+ssh ec2-user@<instance-ip>
+cat /etc/resolv.conf              # Should show VPC resolver
+ping 8.8.8.8                      # Test internet connectivity
+nslookup google.com               # Test DNS resolution
+dig google.com                    # Detailed DNS query
+
+# 3. Check security group
+aws ec2 describe-instances --instance-ids i-xxxxx --query 'Reservations[0].Instances[0].SecurityGroups'
+aws ec2 describe-security-groups --group-ids sg-xxxxx
+
+# 4. Verify routes
+aws ec2 describe-route-tables --filters "Name=vpc-id,Values=vpc-xxxxx"
+```
+
+**Root Cause Priority:**
+1. VPC DNS not enabled (enableDnsSupport=false)
+2. Wrong route table association (missing 0.0.0.0/0 route)
+3. Security group blocking outbound traffic
+4. NAT Gateway down or missing Elastic IP
+
+---
+
+1. b. The TEST EC2 machine receives DNS address translation but fails to communicate to the Internet
+
+DNS works but no internet connectivity means the issue is in the routing/gateway layer.
+
+**Failure points to test:**
+
+1. **Route Table Configuration**
+   - DNS works (queries reach VPC resolver) but traffic can't reach internet
+   - Check if subnet has correct default route:
+     - Public subnet needs: `0.0.0.0/0 → igw-xxxxx`
+     - Private subnet needs: `0.0.0.0/0 → nat-xxxxx`
+   - Verify: `aws ec2 describe-route-tables --route-table-ids <rtb-id>`
+   - Common issue: Route table exists but not associated with subnet
+
+2. **Subnet Route Table Association**
+   - Check which route table is associated with the EC2's subnet
+   - Verify: `aws ec2 describe-route-tables --filters "Name=association.subnet-id,Values=<subnet-id>"`
+   - Could be using default/main route table instead of custom one
+   - Our Terraform: `vpc/main.tf` has explicit `aws_route_table_association` resources
+
+3. **NAT Gateway Issues** (Private subnet EC2)
+   - NAT Gateway status not "available" (could be "pending", "deleting", "failed")
+   - NAT GW deployed in wrong subnet (must be in public subnet)
+   - NAT GW missing Elastic IP allocation
+   - Check: `aws ec2 describe-nat-gateways --nat-gateway-ids <nat-id>`
+   - Verify EIP: `aws ec2 describe-addresses --allocation-ids <eip-allocation-id>`
+
+4. **Internet Gateway Issues** (Public subnet EC2)
+   - IGW not attached to VPC (state should be "attached")
+   - IGW exists but no route pointing to it
+   - Check: `aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=<vpc-id>"`
+
+5. **Security Group Outbound Rules**
+   - DNS (port 53) works but other ports blocked
+   - Check egress rules allow `0.0.0.0/0` on all protocols or specific ports needed
+   - Verify: `aws ec2 describe-security-groups --group-ids <sg-id> --query 'SecurityGroups[0].IpPermissionsEgress'`
+
+6. **Network ACLs (Stateless Filtering)**
+   - NACLs require both inbound AND outbound rules
+   - Default allows all, custom might block return traffic
+   - Check subnet NACL: `aws ec2 describe-network-acls --filters "Name=association.subnet-id,Values=<subnet-id>"`
+   - Must allow ephemeral ports (1024-65535) for return traffic
+
+7. **EC2 Instance Network Interface**
+   - Source/destination check enabled (blocks NAT functionality if EC2 is acting as NAT)
+   - Wrong subnet assignment
+   - Check: `aws ec2 describe-instances --instance-ids <i-id> --query 'Reservations[0].Instances[0].[SubnetId,SourceDestCheck]'`
+
+8. **Elastic IP Issues** (Public subnet EC2)
+   - EIP allocated but not associated with instance/ENI
+   - Check: `aws ec2 describe-addresses --filters "Name=instance-id,Values=<i-id>"`
+
+**Testing Flow:**
+```bash
+# 1. From EC2, test connectivity layers
+ssh ec2-user@<instance-ip>
+
+# Layer 3 (IP) - Test if packets leave
+ping 8.8.8.8                      # Google DNS (should work if routes OK)
+traceroute 8.8.8.8                # See where packets stop
+
+# Layer 4 (TCP) - Test specific services  
+curl -I http://google.com         # HTTP should work if egress rules allow
+curl -I https://google.com        # HTTPS (port 443)
+telnet google.com 80              # Direct port test
+
+# 2. Check instance routing
+ip route                          # Should show default via 10.181.242.1
+cat /etc/resolv.conf              # Verify DNS works (nameserver 10.181.242.2)
+
+# 3. AWS side verification
+# Check route table associated with subnet
+SUBNET_ID=$(aws ec2 describe-instances --instance-ids i-xxxxx --query 'Reservations[0].Instances[0].SubnetId' --output text)
+aws ec2 describe-route-tables --filters "Name=association.subnet-id,Values=$SUBNET_ID"
+
+# Check NAT Gateway (if private subnet)
+aws ec2 describe-nat-gateways --filters "Name=vpc-id,Values=vpc-xxxxx" --query 'NatGateways[*].[NatGatewayId,State,SubnetId]'
+
+# Check IGW (if public subnet)
+aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=vpc-xxxxx"
+```
+
+**Root Cause Priority:**
+1. Missing or wrong route table association (subnet using wrong RT)
+2. NAT Gateway in "failed" or "pending" state
+3. Internet Gateway not attached to VPC
+4. NACL blocking return traffic (ephemeral ports)
+5. Security group blocking specific protocols (but allows DNS)
+
+---
+
+1. c. The TEST EC2 machine has a docker engine installed, its repo is in the vpc alm in the nexus repo machine
+
+Context: Docker connects to Nexus repository in VPC ALM for image pulls
+
+**i. Error 1: pull access denied**
+
+Authentication/authorization problem with Nexus registry.
+
+**Failure points:**
+
+1. **Docker Not Authenticated to Nexus**
+   - Docker client not logged into Nexus registry
+   - Test: `docker login <nexus-url>:<port>`
+   - Credentials might be wrong or expired
+   - Check: `cat ~/.docker/config.json` for auth tokens
+
+2. **Nexus Repository Permissions**
+   - User/service account lacks pull permissions on repository
+   - Nexus realm authentication not configured (Docker Bearer Token Realm)
+   - Check Nexus UI: Security → Realms → Verify "Docker Bearer Token Realm" is active
+   - Verify user has `nx-repository-view-docker-*-browse` and `nx-repository-view-docker-*-read` roles
+
+3. **Wrong Repository URL**
+   - Image name doesn't match Nexus repository name
+   - Format should be: `<nexus-url>:<port>/<repository-name>/<image>:<tag>`
+   - Example: `nexus.vpc-alm.local:8082/docker-hosted/myapp:latest`
+
+4. **Nexus Docker Connector Not Configured**
+   - Docker proxy/hosted repository not set up correctly
+   - HTTP vs HTTPS port mismatch
+   - Check Nexus: Repository → Docker → Verify HTTP/HTTPS connector port
+
+**Testing:**
+```bash
+# 1. Test authentication
+docker login nexus.vpc-alm.local:8082
+Username: <nexus-user>
+Password: <nexus-password>
+
+# 2. List available images (if anonymous browse enabled)
+curl http://nexus.vpc-alm.local:8082/v2/_catalog
+
+# 3. Test pull with full path
+docker pull nexus.vpc-alm.local:8082/docker-hosted/nginx:latest
+
+# 4. Check existing auth
+cat ~/.docker/config.json
+```
+
+**Fix Priority:**
+1. Run `docker login` with correct credentials
+2. Verify Nexus user permissions and roles
+3. Enable Docker Bearer Token Realm in Nexus
+4. Correct image pull path format
+
+---
+
+**ii. Error 2: container pull timeout**
+
+Network connectivity issue between TEST EC2 and Nexus in VPC ALM.
+
+**Failure points:**
+
+1. **Routing Between VPCs**
+   - TEST SPOKE VPC (10.181.242.0/24) needs route to VPC ALM
+   - Check if VPC peering or Transit Gateway configured
+   - Verify route tables have route to VPC ALM CIDR
+   - Test: `ping <nexus-private-ip>` from TEST EC2
+
+2. **Security Group Rules**
+   - TEST EC2 security group must allow outbound to Nexus ports
+   - Nexus security group must allow inbound from TEST EC2
+   - Docker registry uses HTTP (8081-8082) or HTTPS (443)
+   - Check both SGs allow required ports
+
+3. **Nexus Service Not Running**
+   - Nexus service down or starting
+   - Check Nexus EC2: `systemctl status nexus` or `docker ps` (if containerized)
+   - Nexus logs: `/opt/nexus/log/nexus.log`
+
+4. **Network ACLs Blocking Inter-VPC Traffic**
+   - NACLs on both TEST SPOKE and VPC ALM subnets
+   - Must allow both request (e.g., 8082) and response (ephemeral ports)
+
+5. **DNS Resolution for Nexus**
+   - Using hostname `nexus.vpc-alm.local` but can't resolve
+   - Check Route53 private hosted zone or /etc/hosts entry
+   - Test: `nslookup nexus.vpc-alm.local`
+
+6. **Docker Daemon Timeout Configuration**
+   - Default Docker timeout too short for slow networks
+   - Can increase in `/etc/docker/daemon.json`: `{"max-concurrent-downloads": 3}`
+
+**Testing:**
+```bash
+# 1. Test basic connectivity
+ping <nexus-ip>                           # Layer 3
+telnet <nexus-ip> 8082                    # Layer 4 - registry port
+curl http://<nexus-ip>:8081               # Nexus UI
+curl http://<nexus-ip>:8082/v2/          # Docker registry endpoint
+
+# 2. Check routes
+ip route get <nexus-ip>                   # Shows which route is used
+
+# 3. Test from TEST EC2 security group perspective
+aws ec2 describe-security-groups --group-ids <test-ec2-sg> --query 'SecurityGroups[0].IpPermissionsEgress'
+
+# 4. Test Nexus security group
+aws ec2 describe-security-groups --group-ids <nexus-sg> --query 'SecurityGroups[0].IpPermissions'
+
+# 5. Verify VPC peering/TGW routes
+aws ec2 describe-route-tables --route-table-ids <rtb-id> --query 'RouteTables[0].Routes'
+```
+
+**Fix Priority:**
+1. Add VPC peering/TGW route to VPC ALM CIDR
+2. Update security groups to allow TEST EC2 → Nexus on port 8082
+3. Verify Nexus service is running
+4. Check DNS resolution for nexus hostname
+
+---
+
+**iii. Error 3: docker daemon is not running**
+
+Docker service issue on TEST EC2 machine.
+
+**Failure points:**
+
+1. **Docker Service Not Started**
+   - Service stopped or failed to start
+   - Check: `systemctl status docker`
+   - View errors: `journalctl -u docker -n 50`
+
+2. **Docker Not Installed**
+   - Package not installed or partially installed
+   - Check: `which docker` and `docker --version`
+   - Verify: `rpm -qa | grep docker` (Amazon Linux uses RPM)
+
+3. **Docker Socket Permissions**
+   - Socket `/var/run/docker.sock` missing or wrong permissions
+   - User not in `docker` group
+   - Check: `ls -l /var/run/docker.sock`
+
+4. **Storage Driver Issues**
+   - Docker can't initialize storage driver (overlay2)
+   - Disk full or filesystem issues
+   - Check: `df -h` and `docker info`
+
+5. **Conflicting Services**
+   - Another container runtime (containerd, podman) conflict
+   - Check: `systemctl list-units --type=service | grep -i container`
+
+**Testing & Resolution:**
+```bash
+# 1. Check service status
+systemctl status docker
+systemctl is-enabled docker            # Should be "enabled"
+
+# 2. Start docker if stopped
+sudo systemctl start docker
+sudo systemctl enable docker           # Auto-start on boot
+
+# 3. Check logs for errors
+sudo journalctl -u docker -n 100 --no-pager
+sudo tail -f /var/log/messages | grep docker
+
+# 4. Verify installation
+docker --version
+which docker
+
+# 5. Add user to docker group (avoid sudo)
+sudo usermod -aG docker $USER
+newgrp docker                          # Activate group without logout
+
+# 6. Check storage
+df -h /var/lib/docker
+sudo du -sh /var/lib/docker/*
+
+# 7. Reinstall if corrupted (Amazon Linux 2)
+sudo yum remove docker -y
+sudo yum install docker -y
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# 8. Test docker works
+docker run hello-world
+```
+
+**Root Cause Priority:**
+1. Service simply stopped: `systemctl start docker`
+2. Not enabled at boot: `systemctl enable docker`
+3. Permission issue: Add user to docker group
+4. Disk full: Clean up with `docker system prune`
+5. Installation corrupt: Reinstall docker package 

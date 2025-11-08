@@ -1,10 +1,19 @@
 * draft document
 
-why did i choose app of apps pattern?
-why not applications, or applicationset?
+about argo design choices i made
 
-- 
+Why App-of-Apps? 
+    I wanted to seperate all configurations from terraform and use Git as a source of truth.
+    That way, i can dynamically configure environments and modify them easily using helm charts.
+    Using app-of-apps, i can deploy a single resource to the cluster - the root application.
 
-what secret resources do i use?
+    The root application centralizes the bootstrap process: ArgoCD syncs the root app once, which then installs foundational components (ALB controller, External Secrets, Jenkins platform, quiz app) with ordered sync waves to avoid conflicts. 
 
-- 
+Why not individual Applications or an ApplicationSet? 
+    Managing each application separately is a valid strategy as long as the scale is low.
+    When the application amout grows, using apps-of-apps is important to avoid manual creation/synchronization and dependency ordering issues. 
+    ApplicationSets shine when you need many similar apps (clusters, tenants) generated from templates, which isn’t the case here. The footprint is a small, fixed collection of components, so a static apps-of-apps is simpler and more deterministic.
+
+
+what type of secret resources do i use in argocd? for what and why?
+    The platform deploys the External Secrets Operator via gitops/applications/external-secrets.yaml, then the quiz app chart turns on ExternalSecret manifests (gitops/quiz-app/values.yaml (lines 62-74)). These CRDs pull items like /devops-quiz/openai-api-key from AWS SSM Parameter Store into Kubernetes Secrets, keeping credentials off Git while letting ArgoCD reconcile them.

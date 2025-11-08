@@ -33,31 +33,36 @@ Leumi-project/
 │   ├── security-groups/    
 │   └── cloudfront/         
 │
-└── questions/                   # Part 3: Technical Questions
-    ├── questions.txt       
-    └── answers.txt          
+├── questions/                   # Part 3: Technical Questions
+│   ├── questions.txt       
+│   └── answers.txt   
+└── docs/                        # Documentation       
 ```
 
 ---
 
 ## Part 1: Quiz App Pipeline – Flask on Amazon EKS
 
+This project showcases a CI/CD Pipeline on AWS EKS, using Jenkins to run CI and ArgoCD for CD operations.
+All services are accessable using HTTPS using route53 and ACM.
+Infrastructure is orchestrated via Terraform and configured using Argocd App of apps pattern.
+
 ### Architecture Overview
 
 **Full CI/CD pipeline with GitOps workflow:**
 
 ```
-Developer Push → GitHub → Jenkins Pipeline → Docker Build (BuildKit) 
-    → Push to Docker Hub → Update GitOps Repo → ArgoCD Sync → EKS Deployment
+Developer Push → GitHub Webhook → Jenkins Pipeline → Docker Build (BuildKit) 
+    → Push to Docker Hub → Update GitOps Repo → ArgoCD Sync Deployment
 ```
 
 **Infrastructure Components:**
-- **AWS EKS Cluster**: running Kubernetes cluster, 2 nodes
-- **Jenkins Controller**: on EC2 (t3.small) with SSM-only access (private subnet)
-- **Jenkins Agents**: running as dynamic pods on EKS
-- **BuildKit DaemonSet**: for Docker image builds (no Docker-in-Docker)
-- **ArgoCD**: for GitOps continuous delivery
-- **AWS ALB**: HTTPS (ACM certificate) for ingress
+- **AWS EKS Cluster**: running Kubernetes cluster
+- **Jenkins Controller**: EC2 in the private subnet, orchestrates builds
+- **Jenkins Agents**: running as dynamic pod on EKS
+- **ArgoCD**: GitOps CD, manages all EKS configurations, in app-of-apps pattern
+- **AWS ALB**: HTTPS for ingress to all services
+- **Route53**: Public domain for all resources
 - **External Secrets Operator**: syncing from AWS SSM Parameter Store
 
 ### Quick Start
@@ -72,11 +77,14 @@ Developer Push → GitHub → Jenkins Pipeline → Docker Build (BuildKit)
 
 - AWS Account with appropriate IAM permissions
 - AWS CLI configured
+- Public domain in route53
 - Terraform >= 1.5
 - kubectl >= 1.31
 - Helm >= 3.12
 - Docker Hub account
 - GitHub repository access
+
+- **[project-dependencies.txt](configs/project-dependencies.txt)** – Extra dependencies for scripts
 
 #### Deploy Infrastructure
 
@@ -105,8 +113,9 @@ https://quiz.weatherlabs.org
 
 # ArgoCD UI
 https://argocd.weatherlabs.org
-# Username: admin
-# Password: (get from project-utils.sh script)
+
+# Jenkins
+https://jenkins.weatherlabs.org
 ```
 
 ### Architecture Diagram
@@ -114,17 +123,28 @@ https://argocd.weatherlabs.org
 
 ## Part 2: Secure Apache Server – Terraform Infrastructure
 
+This project deploys a secure, highly available web infrastructure for hosting an Apache web server on AWS. 
+Using CloudFront and NLB for public web traffic, and secure direct administrative management.
+
 ### Architecture Overview
 
 **Infrastructure Components:**
-- **EC2 Instance**: Amazon Linux 2, t3.micro Apache web server 
-- **Security Group**: Ingress: 91.231.246.50:80, Access control 
-- **NLB**: Internet-facing, Load balancing
+- **TEST SPOKE VPC**: Hosting resources (`10.181.242.0/24`)
+- **EC2 Instance**: Apache web server with Elastic IP
+- **Security Group**: Allow access only from Leumi proxy and CloudFront
+- **NLB**: Internet-facing, Load balancing (maintains source IP)
 - **Target Group**: HTTP:80, health checks, Backend routing 
-- **Elastic IP**: Static VIP | Fixed IP address 
 - **CloudFront**: Global distribution, CDN & DDoS protection 
 
 ### How to Deploy
+
+#### Prerequisites
+
+1. **AWS CLI** configured with credentials
+2. **Terraform** >= 1.0 installed
+3. **AWS Account** with appropriate permissions
+
+#### Deployment Guide
 
 ```bash
 cd terraform/
@@ -145,13 +165,15 @@ terraform output ec2_public_ip
 ```
 
 ### Architecture Diagram
-<img src="terraform/reference.png">
+<img src="terraform/diagram.png">
 
 ## Part 3: Technical Questions – AWS Troubleshooting
-
-#### These questions reference the architecture in part 2
 
 ### Files
 
 - **[questions.txt](questions/questions.txt)** – Problem scenarios and questions
 - **[answers.txt](questions/answers.txt)** – Detailed troubleshooting steps and solutions
+- 
+### Architecture Diagram For questions
+<img src="questions/reference.png">
+
