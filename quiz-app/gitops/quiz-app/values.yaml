@@ -1,10 +1,4 @@
 # =============================================================================
-# DevOps Quiz Application - Helm Values
-# =============================================================================
-# Configuration for Flask-based quiz application with OpenAI integration
-# Deployed via Jenkins pipeline → ArgoCD GitOps
-
-# =============================================================================
 # APPLICATION CONFIGURATION
 # =============================================================================
 app:
@@ -14,7 +8,7 @@ app:
   image:
     repository: liavvv/quiz-app
     pullPolicy: IfNotPresent
-    tag: "latest"  # Will be overridden by Jenkins pipeline
+    tag: "latest"  # overridden by Jenkins pipeline
   
   # Service configuration
   service:
@@ -22,8 +16,6 @@ app:
     port: 5000
     targetPort: 5000
   
-  # Environment variables
-  # Note: OPENAI_API_KEY is injected from External Secrets (see deployment.yaml)
   env:
     - name: FLASK_ENV
       value: "production"
@@ -48,11 +40,10 @@ serviceAccount:
 ingress:
   enabled: false
 
-# TargetGroupBinding for AWS ALB integration
 targetGroupBinding:
   enabled: true
-  # Target Group ARN from Terraform output
-  targetGroupARN: "arn:aws:elasticloadbalancing:eu-north-1:610964304971:targetgroup/devops-quiz-eks-quiz-app-tg/6cd7c2c417318cea"
+  # value injected from terraform output
+  targetGroupARN: ""
   targetType: ip
   serviceRef:
     name: "quiz-app"
@@ -61,7 +52,8 @@ targetGroupBinding:
     ingress:
       - from:
           - securityGroup:
-              groupID: "sg-0277e331e21718f10"
+              # value injected from terraform output
+              groupID: ""
         ports:
           - protocol: TCP
             port: 5000

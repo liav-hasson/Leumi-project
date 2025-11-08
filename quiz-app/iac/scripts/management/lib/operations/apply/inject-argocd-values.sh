@@ -72,6 +72,8 @@ inject_terraform_values() {
     # Update External Secrets IRSA
     log_info "Updating External Secrets Operator IRSA..."
     sed -i "s|REPLACE_WITH_TERRAFORM_OUTPUT_external_secrets_role_arn|$ESO_ROLE|g" \
+      applications/external-secrets.yaml
+    
     # Update quiz-app values
     if [[ -n "$TG_ARN" ]]; then
         log_info "Updating Quiz App TargetGroupBinding ARN..."
@@ -93,8 +95,6 @@ inject_terraform_values() {
           quiz-app/values.yaml \
           argocd/argocd-targetgroupbinding.yaml
     fi
-    
-    log_success "✓ Terraform values injected into GitOps files"
     
     log_success "✓ Terraform values injected into GitOps files"
     
