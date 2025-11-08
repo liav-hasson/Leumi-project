@@ -37,7 +37,6 @@ spec:
         - tcp://0.0.0.0:{{ .Values.buildkit.port }}
         - --root
         - /var/lib/buildkit
-        - --oci-worker-no-process-sandbox
         ports:
         - containerPort: {{ .Values.buildkit.port }}
           name: buildkit
