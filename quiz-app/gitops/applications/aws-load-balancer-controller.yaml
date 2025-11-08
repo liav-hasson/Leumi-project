@@ -34,7 +34,7 @@ spec:
         - name: serviceAccount.name
           value: aws-load-balancer-controller
         - name: serviceAccount.annotations.eks\.amazonaws\.com/role-arn
-          value: "" # Injected by Terraform
+          value: "arn:aws:iam::610964304971:role/devops-quiz-alb-controller-irsa" # Injected by Terraform
   syncPolicy:
     automated:
       prune: true
