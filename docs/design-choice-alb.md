@@ -1,0 +1,83 @@
+# Load Balancer Management - Design Choices
+
+*Draft document*
+
+A big issue i encounter when working with terraform and kubernetes, is the management of multiple API sources, and resource responsibilty.
+
+## General Rules
+
+the general rules i try to follow are these:
+- let terraform create all infrastructure.
+- let kubernets configure clusters using gitops.
+- use the least amount of scripting, terraform data / local exec blocks.
+
+that is good in theory, but once accutally creating resources in prcatice, several issues happen, and you must bridge the gap between terraform - kubernetes API. 
+
+## Key Questions
+
+some questions i ask myself:
+
+- who controls the cluster load balancers? 
+- how do we pass data from one to another?
+- how to avoid "chicken and egg situations"?
+- where is the line drawn between terrafrom and kubernetes?
+
+---
+
+## Example Case: Creating a Load Balancer for a Kubernetes Service
+
+### 1. Terraform API Case
+
+the load balancer, lets say an ALB, is created before kubernetes configuration. 
+it makes it easy to link it to other terrafrom resources, such as route53, ssl certificates, security groups.
+
+#### Strategies:
+
+##### a. TargetGroupBinding (hybrid, chosen approach)
+
+- TGB is a CRD, provided by the AWS load balancer controller.
+- it lets terraform create the ALB itself, and allows kubernetes to manage the backend targets, dynamically.
+- not the most gitops friendly.
+- need to manage ARN passing from terraform to argocd
+- forces you to deal with finalizers when destroying infra, since the target groups are in terraform, not by the kubernetes controller. (dealt with via bash script)
+
+##### b. tag matching (full terraform control):
+
+- when matching ALB labels between terraform and argocd, the load balancer controller can see that the ALB already exist, and wont create another one. 
+- trying to "trick" the ALB load balancer controller to think it created the ALB.
+- i dont recommend, unstable and can lead to many issues that requires manual patching (for example, default security groups mismatch)
+
+##### c. externalIp service type
+
+- this is a strategy that works with NLBs
+- cost effective, allows easy use for services outside of the cluster.
+- uses gives a static ip to a clusterip service (no nodeport)
+- allows use of service ports.
+- not compatible with ALB.
+
+---
+
+### 2. Kubernetes API Case
+
+letting the cloud load balancer controller to create the ALB after terraform finishes makes it easy to link the load balancer to cluster resources, but leads to problems, like: how do i get route53 to be attached to the ALB?
+
+#### Strategies:
+
+##### a. terraform data sources
+
+- can be used to give the ALB a route53 domain that is created in terraform.
+- using a data source in terraform to wait for the kubernetes controller to finish creating the ALB.
+- the big downside is complex timing management for the data block execution.
+
+##### b. external-dns kubernetes controller (probably the most optimal)
+
+- full kubernetes control, full gitops advantage, proper solution to consider.
+- external-dns can handle route53 for the ALB.
+- security groups created by default with the ALB, not in terraform.
+
+##### c. Partial Creation Pattern
+
+- very similar to full gitops (b.).
+- main difference here is that terraform creates the base security groups.
+- allow for better security complience.
+- clear seperation.

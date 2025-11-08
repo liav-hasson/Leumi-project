@@ -73,7 +73,7 @@ Developer Push → GitHub Webhook → Jenkins Pipeline → Docker Build (BuildKi
 - Edit: **quiz-app/iac/scripts/lib/helpers/config-loader.sh** values for scripts default configuration 
 - Edit: **quiz-app/gitops/** values for resource configuration
 
-### Prerequisites
+#### Prerequisites
 
 - AWS Account with appropriate IAM permissions
 - AWS CLI configured
@@ -84,26 +84,20 @@ Developer Push → GitHub Webhook → Jenkins Pipeline → Docker Build (BuildKi
 - Docker Hub account
 - GitHub repository access
 
-- **[project-dependencies.txt](configs/project-dependencies.txt)** – Extra dependencies for scripts
+- **[Project dependencies](configs/project-dependencies.txt)** – Extra dependencies for scripts
 
 #### Deploy Infrastructure
 
-```bash
-# Enter scripts directory
-cd quiz-app/iac/scripts/management
+- **To deploy and manage the project**, check out the management scripts to get started:
 
-# Run main launch script
-./manage-project (apply|destroy|validate)
+  **[Scripts overview](quiz-app/iac/scripts/README.md)** 
 
-   Flags:
-   --apply,    -a     - Deploy infrastructure and Helm charts
-   --destroy,  -d     - Tear down all infrastructure
-   --validate, -v     - Validate Helm chart structure and configuration
+#### Understanding GitOps and terraform 
 
+- **Check out these documents, explaining the architecture of ArgoCD I used, and the choices i took**:
 
-# Configure kubectl
-aws eks update-kubeconfig --name devops-quiz-eks --region eu-north-1
-```
+  **[GitOps structure](quiz-app/gitops/README.md)** |
+  **[Terraform vs Kuberenets API](docs/design-choice-alb.txt)** 
 
 #### Access Applications
 
@@ -147,6 +141,7 @@ Using CloudFront and NLB for public web traffic, and secure direct administrativ
 #### Deployment Guide
 
 ```bash
+# From project root
 cd terraform/
 
 # Initialize Terraform
@@ -171,9 +166,8 @@ terraform output ec2_public_ip
 
 ### Files
 
-- **[questions.txt](questions/questions.txt)** – Problem scenarios and questions
 - **[answers.txt](questions/answers.txt)** – Detailed troubleshooting steps and solutions
-- 
+  
 ### Architecture Diagram For questions
 <img src="questions/reference.png">
 
