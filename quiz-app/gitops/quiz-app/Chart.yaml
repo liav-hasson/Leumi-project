@@ -13,4 +13,4 @@ type: application
 version: 0.1.0
 
 # Application version - Quiz App version
-appVersion: "v0.0.1"
+appVersion: "v1.0.0"

@@ -8,7 +8,7 @@ app:
   image:
     repository: liavvv/quiz-app
     pullPolicy: IfNotPresent
-    tag: "v0.0.1"  # overridden by Jenkins pipeline
+    tag: "v1.0.0"  # overridden by Jenkins pipeline
   
   # Service configuration
   service:
