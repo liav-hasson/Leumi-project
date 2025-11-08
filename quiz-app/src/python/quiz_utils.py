@@ -51,7 +51,6 @@ def get_categories():
     return list(DATABASE.keys())
 
 def get_subjects(category):
-def get_subjects(category):
     """Return a list of subjects for a given category."""
     if isinstance(DATABASE, list):
         # Find the category in the list
@@ -71,6 +70,7 @@ def get_subjects(category):
     if category in DATABASE:
         return list(DATABASE[category].keys())
     return []
+
 def get_random_keyword(category, subject):
     """Return a random keyword for a given category and subject."""
     try:
@@ -78,9 +78,12 @@ def get_random_keyword(category, subject):
             keywords = DATABASE[category][subject].get("keywords", [])
             return random.choice(keywords) if keywords else None
         return None
-    except Exception as e:
-        print(f"Error in get_random_keyword: {e}")
+    
+    except (KeyError, IndexError, TypeError) as exc:
+        print(f"Error in get_random_keyword: {exc}")
         print(f"Category: {category}, Subject: {subject}")
+        return None
+
 # Run debug only when this file is executed directly
 if __name__ == '__main__':
     debug_database_structure()

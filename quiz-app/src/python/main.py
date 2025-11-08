@@ -33,12 +33,11 @@ def reset_session(full=True):
         session.pop('answer', None)
         session.pop('keyword', None)
         session.pop('feedback', None)
+
 # --- Main index page (select category/subject/difficulty) ---
 @app.route('/', methods=["GET", "POST"])
 def index():
-    """Render the main page for category/subject/difficulty selection."""ndex page (select category/subject/difficulty) ---
-@app.route('/', methods=["GET", "POST"])
-def index():
+    """Render the main page for category/subject/difficulty selection."""
     categories = get_categories()
     feedback = session.pop('feedback', None)  # Get and remove feedback from session
 
@@ -62,11 +61,10 @@ def index():
             session['difficulty'] = request.form['difficulty'] or None
 
         if action == "generate":
-                keyword = get_random_keyword(
-                    session['selected_category'],
-                    session['selected_subject']
-                )
-                session['keyword'] = keywordession['keyword'] = get_random_keyword(
+            if not session.get("difficulty"):
+                feedback = "Please select a difficulty before generating a question."
+            elif session.get('selected_category') and session.get('selected_subject'):
+                session['keyword'] = get_random_keyword(
                     session['selected_category'],
                     session['selected_subject']
                 )
@@ -77,7 +75,8 @@ def index():
                 )
                 return redirect(url_for('question_page'))
 
-    subjects = get_subjects(session.get('selected_category')) if session.get('selected_category') else []
+    subjects = (get_subjects(session.get('selected_category'))
+                if session.get('selected_category') else [])
 
     return render_template(
         "index.html",
@@ -88,16 +87,16 @@ def index():
         difficulty=session.get('difficulty'),
         feedback=feedback
     )
+
+
 # --- Question page (answer & feedback) ---
 @app.route('/question', methods=["GET", "POST"])
 def question_page():
+    """Render the question page and handle answer submission."""
     # Check if we have a question, if not redirect to index
     if not session.get('question'):
         return redirect(url_for('index'))
 
-    feedback = Noneget('question'):
-        return redirect(url_for('index'))
-    
     feedback = None
     question = session.get('question')
     keyword = session.get('keyword')
@@ -114,7 +113,6 @@ def question_page():
                 feedback = evaluate_answer(question, answer, int(difficulty))
                 # Store feedback in session to persist across page refreshes
                 session['feedback'] = feedback
-
         elif action == "ask_again":
             reset_session(full=False)
             return redirect(url_for('index'))
@@ -123,6 +121,7 @@ def question_page():
             reset_session(full=True)
             return redirect(url_for('index'))
 
+    # Get feedback from session if it exists (for both GET and POST requests)
     # Get feedback from session if it exists (for both GET and POST requests)
     feedback = session.get('feedback', feedback)
 
@@ -138,12 +137,12 @@ def question_page():
 if __name__ == "__main__":
     # Don't run in debug mode or bind to 0.0.0.0 by default in production.
     # Use environment variables to control runtime behavior for local testing.
+    debug_env = os.environ.get("FLASK_DEBUG", "false").lower()
+    debug = debug_env in ("1", "true", "yes")
+    host = os.environ.get("FLASK_HOST", "127.0.0.1")
     try:
         PORT = int(os.environ.get("FLASK_PORT", 5000))
     except (TypeError, ValueError):
         PORT = 5000
 
     app.run(debug=debug, host=host, port=PORT)
-    app.run(debug=debug, host=host, port=PORT)
-
-    app.run(debug=debug, host=host, port=port)
