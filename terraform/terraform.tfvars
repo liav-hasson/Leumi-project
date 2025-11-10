@@ -23,7 +23,7 @@ private_subnet_cidrs = ["10.181.242.128/26", "10.181.242.192/26"] # Second half 
 # =============================================================================
 ec2_ami_id        = "" # if needed. fall back to latest Amazon linux.
 ec2_instance_type = "t3.micro"
-ec2_volume_size   = 20
+ec2_volume_size   = 30  # Minimum size required by AMI snapshot
 ec2_private_ip    = "" # if empty, will auto assign
 enable_elastic_ip = true
 
